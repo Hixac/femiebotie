@@ -1,3 +1,4 @@
+import db
 import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -66,6 +67,12 @@ class Bot:
             self._last_event = BotEvent(i)
             yield BotEvent(i)
 
+    def get_raw_conversation_members(self, peer_id):
+        if not isinstance(peer_id, int):
+            raise ValueError("Restricted type")
+        
+        return self._session.method("messages.getConversationMembers", {"peer_id": peer_id})
+            
     def send_message(self, msg, peer_id, reply_id=0):
         if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(reply_id, int):
             raise ValueError("Restricted type")
@@ -93,14 +100,26 @@ class ThreadSafeBot:
     def send_message(self, msg: str, peer_id: int, reply_id: int = 0):
         self._loop.run_in_executor(self._executor, self._bot.send_message, msg, peer_id, reply_id)
 
+    def get_raw_conversation_members(self, peer_id: int):
+        return self._loop.run_in_executor(self._executor, self._bot.get_raw_conversation_members, peer_id)
+        
 def run_listener(queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
     bot_listener = Bot()
     for event in bot_listener.get_event():
         asyncio.run_coroutine_threadsafe(queue.put(event), loop)
 
+async def init_database(event, safe_bot):
+    members = await safe_bot.get_raw_conversation_members(event.peer_id)
+    profiles = members['profiles']
+    for user in profiles:
+        db.add_user(user['id'], user['last_name'], user['first_name'], event.peer_id)
+        
 async def process_input_async(event, safe_bot):
     await comand.tag(event, safe_bot)
 
+async def process_user(event):
+    db.increment_msg_count(event.author_id, event.peer_id)
+    
 async def main():
     queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
@@ -113,11 +132,12 @@ async def main():
     thread.start()
     
     first_event = await queue.get()
-    print("Skipped first event")
+    db = await init_database(first_event, safe_bot)
     
     while True:
         event = await queue.get()
         asyncio.create_task(process_input_async(event, safe_bot))
+        asyncio.create_task(process_user(event))
 
 if __name__ == "__main__":
     asyncio.run(main())

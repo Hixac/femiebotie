@@ -1,3 +1,4 @@
+import db
 import asyncio
 import random
 from config import TG_API_ID, TG_API_HASH, TG_PHONE
@@ -56,6 +57,30 @@ async def axe(name, event, bot, index=1, is_rand=False):
     post = await async_get_post(name, index, is_rand)
     bot.send_message(post, event.peer_id)
 
+async def fancy_top(num, sec_name, name, msg_count):
+    template = f"{name} {sec_name} написал {msg_count} сообщений"
+    fire = "🔥"; snowman = "⛄"; flower = "🌼"; nl = "\n"
+    if num == 1:
+        return fire * 3 + template + fire * 3 + nl
+    if num == 2:
+        return snowman * 2 + template + snowman * 2 + nl
+    if num == 3:
+        return flower + template + flower + nl
+    if num == 4:
+        return "\n\n😽ОСТАЛЬНЫМ СПАСИБКИ ЗА АКТИВ😽\n\n" + f"{str(num)}. " + template + nl
+
+    return f"{str(num)}. " + template + nl
+    
+async def get_top_members(bot, peer_id):
+    mems = db.get_top_members(peer_id)
+    ans = "🐒🦄 НАШИ ТОПОВЫЕ АКТИВЧИКИ ⭐\n\n"
+    for i in range(10):
+        vk_id = mems[i][1]; msg_count = mems[i][3]
+        person = db.get_user(vk_id)
+        ans += await fancy_top(i + 1, person[1], person[2], msg_count)
+    
+    bot.send_message(ans, peer_id)
+    
 async def tag(event, bot):
     """Асинхронная обработка входящих команд"""
     if not event.message:
@@ -73,6 +98,10 @@ async def tag(event, bot):
         # Обработка команды gork
         if tag == "gork" or tag == "горк":
             await gork(rest_msg, event, bot)
+            return
+
+        if tag == "активы":
+            await get_top_members(bot, event.peer_id)
             return
         
         # Определение параметров для команд
