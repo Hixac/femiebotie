@@ -75,17 +75,49 @@ async def get_top_members(bot, peer_id):
     mems = db.get_top_members(peer_id)
     ans = "🐒🦄 НАШИ ТОПОВЫЕ АКТИВЧИКИ ⭐\n\n"
     for i in range(10):
-        vk_id = mems[i][1]; msg_count = mems[i][3]
+        vk_id = mems[i][1]; msg_count = mems[i][5]
         person = db.get_user(vk_id)
         ans += await fancy_top(i + 1, person[1], person[2], msg_count)
     
     bot.send_message(ans, peer_id)
+
+async def get_admins(bot, peer_id):
+    mems = db.get_admin_members(peer_id)
+    ans = "Список админов\n\n"
+    for i in range(len(mems)):
+        vk_id = mems[i][1]
+        person = db.get_user(vk_id)
+        ans += f"{i + 1}. {person[2]} {person[1]}\n"
     
+    bot.send_message(ans, peer_id)
+
+async def get_owner(bot, peer_id):
+    mems = db.get_owner(peer_id)
+    if len(mems) == 0:
+        bot.send_message("Основателем является паблик", peer_id)
+        return
+        
+    ans = "Основатель: "
+    vk_id = mems[0][1]
+    person = db.get_user(vk_id)
+    ans += f"{person[2]} {person[1]}"
+    
+    bot.send_message(ans, peer_id)
+
+async def is_owner(event):
+    owner = db.get_owner(event.peer_id) 
+    return len(owner) > 0 and owner[0][1] == event.author_id
+
+async def is_admin(event):
+    admins = db.get_admin_members(event.peer_id)
+    admins = [i[1] for i in admins]
+    return len(admins) > 0 and event.author_id in admins
+
 async def tag(event, bot):
     """Асинхронная обработка входящих команд"""
     if not event.message:
         return
-    
+
     try:
         msg = event.message.strip()
         if not msg:
@@ -94,12 +126,24 @@ async def tag(event, bot):
         parts = msg.split(maxsplit=1)
         tag = parts[0].lstrip("@").rstrip(",").lower()
         rest_msg = parts[1] if len(parts) > 1 else ""
+
+        if tag == 'sql' and await is_owner(event):
+            bot.send_message(str(db.query(rest_msg)), event.peer_id)
+            return
         
         # Обработка команды gork
         if tag == "gork" or tag == "горк":
             await gork(rest_msg, event, bot)
             return
 
+        if tag == "основатель":
+            await get_owner(bot, event.peer_id)
+            return
+        
+        if tag == "админы":
+            await get_admins(bot, event.peer_id)
+            return
+        
         if tag == "активы":
             await get_top_members(bot, event.peer_id)
             return

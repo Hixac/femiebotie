@@ -108,13 +108,17 @@ def run_listener(queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
     for event in bot_listener.get_event():
         asyncio.run_coroutine_threadsafe(queue.put(event), loop)
 
-async def init_database(event, safe_bot):
-    members = await safe_bot.get_raw_conversation_members(event.peer_id)
+async def init_database(peer_id, safe_bot):
+    members = await safe_bot.get_raw_conversation_members(peer_id)
     profiles = members['profiles']
+    admins = [i['member_id'] for i in members['items'] if 'is_admin' in i and i['is_admin']]
+    owner = [i['member_id'] for i in members['items'] if 'is_owner' in i and i['is_owner']][0]
     for user in profiles:
-        db.add_user(user['id'], user['last_name'], user['first_name'], event.peer_id)
+        db.add_user(user['id'], user['last_name'], user['first_name'], peer_id, is_admin=(True if user['id'] in admins else False), is_owner=(True if user['id'] == owner else False))
         
 async def process_input_async(event, safe_bot):
+    if not db.is_chat_existing(event.peer_id):
+        await init_database(event.peer_id, safe_bot)
     await comand.tag(event, safe_bot)
 
 async def process_user(event):
@@ -130,9 +134,6 @@ async def main():
     
     thread = threading.Thread(target=run_listener, args=(queue, loop), daemon=True)
     thread.start()
-    
-    first_event = await queue.get()
-    db = await init_database(first_event, safe_bot)
     
     while True:
         event = await queue.get()
