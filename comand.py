@@ -1,72 +1,96 @@
-from random import randint
+import asyncio
+import random
 from config import TG_API_ID, TG_API_HASH, TG_PHONE
-from telethon.sync import TelegramClient
+from telethon import TelegramClient
 from telethon.tl.types import PeerChannel
 from openrouter_api import api
-from main import Bot
 
-client = TelegramClient('rofls', TG_API_ID, TG_API_HASH)
+# Глобальный кеш для клиента Telegram
+_tg_client = None
 
-def get_post(name, index = 1, is_rand = False):
+async def get_tg_client():
+    """Асинхронный клиент Telegram с ленивой инициализацией"""
+    global _tg_client
+    if _tg_client is None:
+        _tg_client = TelegramClient('rofls', TG_API_ID, TG_API_HASH)
+        await _tg_client.start(phone=TG_PHONE)
+    return _tg_client
+
+async def async_get_post(name, index=1, is_rand=False):
+    """Асинхронное получение поста из Telegram канала"""
     if not isinstance(is_rand, bool):
-        raise ValueError("Restricted type")
+        raise ValueError("is_rand must be boolean")
     if not isinstance(index, int):
-        raise ValueError("Restricted type")
-    client.start(phone=TG_PHONE)
-    channel = client.get_entity(name)
-
-    l = []
+        raise ValueError("index must be integer")
+    
+    client = await get_tg_client()
+    channel = await client.get_entity(name)
+    
     if is_rand:
-        for msg in client.iter_messages(channel, limit=100):
-            l.append(msg.text)
-        return l[randint(0, 99)]
+        messages = []
+        async for msg in client.iter_messages(channel, limit=100):
+            if msg.text:
+                messages.append(msg.text)
+        return random.choice(messages) if messages else "Не найдено сообщений"
     
-    for msg in client.iter_messages(channel, limit=index):
-        l.append(msg.text)
-        
-    return l[-1]
+    messages = []
+    async for msg in client.iter_messages(channel, limit=index):
+        if msg.text:
+            messages.append(msg.text)
+    return messages[-1] if messages else "Не найдено сообщений"
 
-def gork(msg, bot):
+async def gork(msg, event, bot):
+    """Асинхронная обработка команды gork"""
     if not isinstance(msg, str):
-        raise ValueError("Restricted type")
+        raise ValueError("msg must be string")
+    
     reply = ""
-    if bot.last_event.reply_message != "":
-        reply = "\n\nКонтекст: \"" + bot.last_event.reply_message + "\""
-    content = api.query(msg + reply)
-    bot.send_message(content, bot.last_event.peer_id)
-
-def axe(name, bot, index = 1, is_rand = False):
-    bot.send_message(get_post(name, index, is_rand), bot.last_event.peer_id)    
+    if event.reply_message:
+        reply = f"\n\nКонтекст: \"{event.reply_message}\""
     
-def tag(msg, bot):
-    if not isinstance(msg, str):
-        raise ValueError("Restricted type")
-    if len(msg) == 0:
+    content = await api.async_query(msg + reply)
+    bot.send_message(content, event.peer_id)
+
+async def axe(name, event, bot, index=1, is_rand=False):
+    """Асинхронная обработка команды axe"""
+    post = await async_get_post(name, index, is_rand)
+    bot.send_message(post, event.peer_id)
+
+async def tag(event, bot):
+    """Асинхронная обработка входящих команд"""
+    if not event.message:
         return
-
-    try:    
-        rest_msg = msg.split()
-        tag = rest_msg[0].lstrip("@").rstrip(",")
-        rest_msg = " ".join(msg.split()[1:])
+    
+    try:
+        msg = event.message.strip()
+        if not msg:
+            return
         
-        if tag.lower() == "gork":
-            gork(rest_msg, bot)
-
-        is_rand = False
-        if rest_msg == "рандом":
-            is_rand = True
-
+        parts = msg.split(maxsplit=1)
+        tag = parts[0].lstrip("@").rstrip(",").lower()
+        rest_msg = parts[1] if len(parts) > 1 else ""
+        
+        # Обработка команды gork
+        if tag == "gork" or tag == "горк":
+            await gork(rest_msg, event, bot)
+            return
+        
+        # Определение параметров для команд
+        is_rand = rest_msg.lower() == "рандом"
         index = 1
-        if rest_msg.isnumeric():
+        if rest_msg.isdigit():
             index = int(rest_msg)
-            
-        if tag.lower() == "топор":
-            axe(PeerChannel(1237513492), bot, index, is_rand)
-                
-        if tag.lower() == "ньюсач":
-            axe("ru2ch", bot, index, is_rand)
         
-        if tag.lower() == "униан":
-            axe("uniannet", bot, index, is_rand)
+        # Обработка команд каналов
+        if tag == "топор":
+            await axe(PeerChannel(1237513492), event, bot, index, is_rand)
+        elif tag == "ньюсач":
+            await axe("ru2ch", event, bot, index, is_rand)
+        elif tag == "униан":
+            await axe("uniannet", event, bot, index, is_rand)
+        elif tag == "поздняков":
+            await axe(PeerChannel(1732054517), event, bot, index, is_rand)
+            
     except Exception as e:
-        print(e)
+        print(f"Ошибка обработки команды: {e}")
+        bot.send_message("⚠️ Произошла ошибка при обработке команды", event.peer_id)

@@ -1,3 +1,7 @@
+import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotMessageEvent, VkBotEventType
 import comand
@@ -8,6 +12,14 @@ class BotEvent:
     def __init__(self, event: VkBotMessageEvent):
         self.event = event
 
+    @property
+    def conversation_message_id(self):
+        return self.event.message['id']
+        
+    @property
+    def raw(self):
+        return self.event
+        
     @property
     def event_type(self) -> VkBotEventType:
         return self.event.type
@@ -54,27 +66,58 @@ class Bot:
             self._last_event = BotEvent(i)
             yield BotEvent(i)
 
-    def send_message(self, msg, peer_id):
-        if not isinstance(msg, str) or not isinstance(peer_id, int):
+    def send_message(self, msg, peer_id, reply_id=0):
+        if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(reply_id, int):
             raise ValueError("Restricted type")
         if msg == "":
             msg = "Пустое сообщение"
-        self._session.method("messages.send", {"peer_id": peer_id, "random_id": 0, "message": msg, "attachment": "" })
             
-def process_input(event, bot):
-    if not isinstance(event, BotEvent) or not isinstance(bot, Bot):
-        raise ValueError("Restricted type")
-    if event.event_type.value == "message_new":
-        comand.tag(event.message, bot)
-            
-def main():
-    bot = Bot()
-    is_inited = False
-    for e in bot.get_event():
-        if not is_inited:
-            is_inited = True
-            continue
-        process_input(e, bot)
-                
+        params = {
+            "peer_id": peer_id,
+            "random_id": 0,
+            "message": msg,
+            "attachment": ""
+        }
+        
+        if reply_id > 0:
+            params["reply_to"] = reply_id
+        
+        self._session.method("messages.send", params)
+
+class ThreadSafeBot:
+    def __init__(self, bot: Bot, loop: asyncio.AbstractEventLoop, executor: ThreadPoolExecutor):
+        self._bot = bot
+        self._loop = loop
+        self._executor = executor
+
+    def send_message(self, msg: str, peer_id: int, reply_id: int = 0):
+        self._loop.run_in_executor(self._executor, self._bot.send_message, msg, peer_id, reply_id)
+
+def run_listener(queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
+    bot_listener = Bot()
+    for event in bot_listener.get_event():
+        asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+
+async def process_input_async(event, safe_bot):
+    await comand.tag(event, safe_bot)
+
+async def main():
+    queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    executor = ThreadPoolExecutor(max_workers=10)
+    
+    bot_sender = Bot()
+    safe_bot = ThreadSafeBot(bot_sender, loop, executor)
+    
+    thread = threading.Thread(target=run_listener, args=(queue, loop), daemon=True)
+    thread.start()
+    
+    first_event = await queue.get()
+    print("Skipped first event")
+    
+    while True:
+        event = await queue.get()
+        asyncio.create_task(process_input_async(event, safe_bot))
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

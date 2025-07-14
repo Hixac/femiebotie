@@ -1,0 +1,7 @@
+#!/bin/sh
+
+PATH=/home/hixac/Projects/ultimate_bot/femiebotie
+PYTHON=/home/hixac/Projects/ultimate_bot/femiebotie/venv/bin/python3.13
+
+exec 2>&1
+exec $PYTHON $PATH/main.py
