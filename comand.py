@@ -1,6 +1,7 @@
 import db
 import asyncio
 import random
+import error_handle as eh
 from config import TG_API_ID, TG_API_HASH, TG_PHONE
 from telethon import TelegramClient
 from telethon.tl.types import PeerChannel
@@ -50,14 +51,14 @@ async def gork(msg, event, bot):
         reply = f"\n\nКонтекст: \"{event.reply_message}\""
     
     content = await api.async_query(msg + reply)
-    bot.send_message(content, event.peer_id)
+    await bot.send_message(content, event.peer_id)
 
 async def axe(name, event, bot, index=1, is_rand=False):
     """Асинхронная обработка команды axe"""
     post = await async_get_post(name, index, is_rand)
-    bot.send_message(post, event.peer_id)
+    await bot.send_message(post, event.peer_id)
 
-async def fancy_top(num, sec_name, name, msg_count):
+def fancy_top(num, sec_name, name, msg_count):
     template = f"{name} {sec_name} написал {msg_count} сообщений"
     fire = "🔥"; snowman = "⛄"; flower = "🌼"; nl = "\n"
     if num == 1:
@@ -77,9 +78,9 @@ async def get_top_members(bot, peer_id):
     for i in range(10):
         vk_id = mems[i][1]; msg_count = mems[i][5]
         person = db.get_user(vk_id)
-        ans += await fancy_top(i + 1, person[1], person[2], msg_count)
-    
-    bot.send_message(ans, peer_id)
+        ans += fancy_top(i + 1, person[1], person[2], msg_count)
+
+    await bot.send_message(ans, peer_id)
 
 async def get_admins(bot, peer_id):
     mems = db.get_admin_members(peer_id)
@@ -89,12 +90,12 @@ async def get_admins(bot, peer_id):
         person = db.get_user(vk_id)
         ans += f"{i + 1}. {person[2]} {person[1]}\n"
     
-    bot.send_message(ans, peer_id)
+    await bot.send_message(ans, peer_id)
 
 async def get_owner(bot, peer_id):
     mems = db.get_owner(peer_id)
     if len(mems) == 0:
-        bot.send_message("Основателем является паблик", peer_id)
+        await bot.send_message("Основателем является паблик", peer_id)
         return
         
     ans = "Основатель: "
@@ -102,68 +103,64 @@ async def get_owner(bot, peer_id):
     person = db.get_user(vk_id)
     ans += f"{person[2]} {person[1]}"
     
-    bot.send_message(ans, peer_id)
+    await bot.send_message(ans, peer_id)
 
-async def is_owner(event):
+def is_owner(event):
     owner = db.get_owner(event.peer_id) 
     return len(owner) > 0 and owner[0][1] == event.author_id
 
-async def is_admin(event):
+def is_admin(event):
     admins = db.get_admin_members(event.peer_id)
     admins = [i[1] for i in admins]
     return len(admins) > 0 and event.author_id in admins
 
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 async def tag(event, bot):
     """Асинхронная обработка входящих команд"""
     if not event.message:
         return
 
-    try:
-        msg = event.message.strip()
-        if not msg:
-            return
-        
-        parts = msg.split(maxsplit=1)
-        tag = parts[0].lstrip("@").rstrip(",").lower()
-        rest_msg = parts[1] if len(parts) > 1 else ""
+    msg = event.message.strip()
+    if not msg:
+        return
+    
+    parts = msg.split(maxsplit=1)
+    tag = parts[0].lstrip("@").rstrip(",").lower()
+    rest_msg = parts[1] if len(parts) > 1 else ""
 
-        if tag == 'sql' and await is_owner(event):
-            bot.send_message(str(db.query(rest_msg)), event.peer_id)
-            return
+    if tag == 'sql' and is_owner(event):
+        await bot.send_message(str(db.query(rest_msg)), event.peer_id)
+        return
         
-        # Обработка команды gork
-        if tag == "gork" or tag == "горк":
-            await gork(rest_msg, event, bot)
-            return
+    # Обработка команды gork
+    if tag == "gork" or tag == "горк":
+        await gork(rest_msg, event, bot)
+        return
 
-        if tag == "основатель":
-            await get_owner(bot, event.peer_id)
-            return
+    if tag == "основатель":
+        await get_owner(bot, event.peer_id)
+        return
         
-        if tag == "админы":
-            await get_admins(bot, event.peer_id)
-            return
+    if tag == "админы":
+        await get_admins(bot, event.peer_id)
+        return
         
-        if tag == "активы":
-            await get_top_members(bot, event.peer_id)
-            return
+    if tag == "активы":
+        await get_top_members(bot, event.peer_id)
+        return
         
-        # Определение параметров для команд
-        is_rand = rest_msg.lower() == "рандом"
-        index = 1
-        if rest_msg.isdigit():
-            index = int(rest_msg)
-        
-        # Обработка команд каналов
-        if tag == "топор":
-            await axe(PeerChannel(1237513492), event, bot, index, is_rand)
-        elif tag == "ньюсач":
-            await axe("ru2ch", event, bot, index, is_rand)
-        elif tag == "униан":
-            await axe("uniannet", event, bot, index, is_rand)
-        elif tag == "поздняков":
-            await axe(PeerChannel(1732054517), event, bot, index, is_rand)
+    # Определение параметров для команд
+    is_rand = rest_msg.lower() == "рандом"
+    index = 1
+    if rest_msg.isdigit():
+        index = int(rest_msg)
             
-    except Exception as e:
-        print(f"Ошибка обработки команды: {e}")
-        bot.send_message("⚠️ Произошла ошибка при обработке команды", event.peer_id)
+    # Обработка команд каналов
+    if tag == "топор":
+        await axe(PeerChannel(1237513492), event, bot, index, is_rand)
+    elif tag == "ньюсач":
+        await axe("ru2ch", event, bot, index, is_rand)
+    elif tag == "униан":
+        await axe("uniannet", event, bot, index, is_rand)
+    elif tag == "поздняков":
+        await axe(PeerChannel(1732054517), event, bot, index, is_rand)

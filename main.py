@@ -97,11 +97,11 @@ class ThreadSafeBot:
         self._loop = loop
         self._executor = executor
 
-    def send_message(self, msg: str, peer_id: int, reply_id: int = 0):
-        self._loop.run_in_executor(self._executor, self._bot.send_message, msg, peer_id, reply_id)
+    async def send_message(self, msg: str, peer_id: int, reply_id: int = 0):
+        await self._loop.run_in_executor(self._executor, self._bot.send_message, msg, peer_id, reply_id)
 
-    def get_raw_conversation_members(self, peer_id: int):
-        return self._loop.run_in_executor(self._executor, self._bot.get_raw_conversation_members, peer_id)
+    async def get_raw_conversation_members(self, peer_id: int):
+        return await self._loop.run_in_executor(self._executor, self._bot.get_raw_conversation_members, peer_id)
         
 def run_listener(queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
     bot_listener = Bot()
