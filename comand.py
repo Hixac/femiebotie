@@ -48,7 +48,7 @@ async def gork(msg, event, bot):
     
     reply = ""
     if event.reply_message:
-        reply = f"\n\nКонтекст: \"{event.reply_message}\""
+        reply = f"\n\nКонтекст: \"{event.reply_message[1]}\""
     
     content = await api.async_query(msg + reply)
     await bot.send_message(content, event.peer_id)
@@ -114,13 +114,35 @@ def is_admin(event):
     admins = [i[1] for i in admins]
     return len(admins) > 0 and event.author_id in admins
 
+async def who_am_i(vk_id, peer_id, bot):    
+    base_info = db.get_user(vk_id)
+    user_chat_info = db.get_user_chat(vk_id, peer_id)
+
+    ans = ""
+    ans += "👀Информация об " + base_info[2] + " " + base_info[1]
+    ans += "\n\nНаписал сообщений " + str(user_chat_info[5])
+    if user_chat_info[4]:
+        ans += "\nЯвляется основателем!!!✍"
+    else: ans += "\nНе является основателем...😪"
+    if user_chat_info[3]:
+        ans += "\nЯвляется админчиком!!!🤩"
+    else: ans += "\nНе является админом...😰"
+    
+    await bot.send_message(ans, peer_id)
+
+async def who_are_you(event, bot):
+    reply = event.reply_message
+    if len(reply) == 0:
+        return #add behaviour
+    await who_am_i(reply[0], event.peer_id, bot)
+    
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 async def tag(event, bot):
     """Асинхронная обработка входящих команд"""
     if not event.message:
         return
 
-    msg = event.message.strip()
+    msg = event.message.strip().lower()
     if not msg:
         return
     
@@ -128,6 +150,14 @@ async def tag(event, bot):
     tag = parts[0].lstrip("@").rstrip(",").lower()
     rest_msg = parts[1] if len(parts) > 1 else ""
 
+    if msg == "кто ты":
+        await who_are_you(event, bot)
+        return
+    
+    if msg == "кто я":
+        await who_am_i(event.author_id, event.peer_id, bot)
+        return
+    
     if tag == 'sql' and is_owner(event):
         await bot.send_message(str(db.query(rest_msg)), event.peer_id)
         return

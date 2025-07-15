@@ -28,8 +28,8 @@ class BotEvent:
     @property
     def reply_message(self) -> str:
         if "reply_message" in self.event.message:
-            return self.event.message["reply_message"]["text"]
-        return ""
+            return (self.event.message["reply_message"]["from_id"], self.event.message["reply_message"]["text"])
+        return ()
     
     @property
     def message(self) -> str:

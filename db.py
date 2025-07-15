@@ -38,6 +38,10 @@ def get_user(vk_id):
     cur.execute(f"SELECT * FROM people WHERE vk_id={vk_id}")
     return cur.fetchone()
 
+def get_user_chat(vk_id, peer_id):
+    cur.execute(f"SELECT * FROM people_chat WHERE vk_id={vk_id} AND peer_id={peer_id}")
+    return cur.fetchone()
+
 def add_admin(vk_id, peer_id):
     cur.execute(f"UPDATE people_chat SET is_admin = TRUE WHERE vk_id={vk_id} AND peer_id={peer_id}")
 
