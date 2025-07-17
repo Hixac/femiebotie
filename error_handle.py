@@ -37,5 +37,7 @@ async def connection_response(e, func, *args, **kwargs):
                 return
             
 async def automatic_response(e, event, bot):
+    import traceback
     print(f"Ошибка обработки команды: {e}")
+    traceback.print_exc()
     await bot.send_message("⚠️ Произошла ошибка при обработке команды", event.peer_id)

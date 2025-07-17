@@ -75,10 +75,10 @@ def fancy_top(num, sec_name, name, msg_count):
 async def get_top_members(bot, peer_id):
     mems = db.get_top_members(peer_id)
     ans = "🐒🦄 НАШИ ТОПОВЫЕ АКТИВЧИКИ ⭐\n\n"
-    for i in range(10):
-        vk_id = mems[i][1]; msg_count = mems[i][5]
+    for i in range(min(len(mems), 10)):
+        vk_id = mems[i].vk_id; msg_count = mems[i].msg_count
         person = db.get_user(vk_id)
-        ans += fancy_top(i + 1, person[1], person[2], msg_count)
+        ans += fancy_top(i + 1, person.sec_name, person.name, msg_count)
 
     await bot.send_message(ans, peer_id)
 
@@ -86,28 +86,28 @@ async def get_admins(bot, peer_id):
     mems = db.get_admin_members(peer_id)
     ans = "Список админов\n\n"
     for i in range(len(mems)):
-        vk_id = mems[i][1]
+        vk_id = mems[i].vk_id
         person = db.get_user(vk_id)
-        ans += f"{i + 1}. {person[2]} {person[1]}\n"
+        ans += f"{i + 1}. {person.name} {person.sec_name}\n"
     
     await bot.send_message(ans, peer_id)
 
 async def get_owner(bot, peer_id):
-    mems = db.get_owner(peer_id)
-    if len(mems) == 0:
+    owner = db.get_owner(peer_id)
+    if owner is None:
         await bot.send_message("Основателем является паблик", peer_id)
         return
         
     ans = "Основатель: "
-    vk_id = mems[0][1]
+    vk_id = owner.vk_id
     person = db.get_user(vk_id)
-    ans += f"{person[2]} {person[1]}"
+    ans += f"{person.name} {person.sec_name}"
     
     await bot.send_message(ans, peer_id)
 
 def is_owner(event):
     owner = db.get_owner(event.peer_id) 
-    return len(owner) > 0 and owner[0][1] == event.author_id
+    return not (owner is None) and owner.vk_id == event.author_id
 
 def is_admin(event):
     admins = db.get_admin_members(event.peer_id)
@@ -118,13 +118,13 @@ async def who_am_i(vk_id, peer_id, bot):
     base_info = db.get_user(vk_id)
     user_chat_info = db.get_user_chat(vk_id, peer_id)
 
-    ans = ""
-    ans += "👀Информация об " + base_info[2] + " " + base_info[1]
-    ans += "\n\nНаписал сообщений " + str(user_chat_info[5])
-    if user_chat_info[4]:
+    ans = "СТАТЫ\n"
+    ans += "👀Информация об " + base_info.sec_name + " " + base_info.name
+    ans += "\n\nНаписал сообщений " + str(user_chat_info.msg_count)
+    if user_chat_info.is_owner:
         ans += "\nЯвляется основателем!!!✍"
     else: ans += "\nНе является основателем...😪"
-    if user_chat_info[3]:
+    if user_chat_info.is_admin:
         ans += "\nЯвляется админчиком!!!🤩"
     else: ans += "\nНе является админом...😰"
     
@@ -167,15 +167,15 @@ async def tag(event, bot):
         await gork(rest_msg, event, bot)
         return
 
-    if tag == "основатель":
+    if msg == "/основатель":
         await get_owner(bot, event.peer_id)
         return
         
-    if tag == "админы":
+    if msg == "/админы":
         await get_admins(bot, event.peer_id)
         return
         
-    if tag == "активы":
+    if msg == "/активы":
         await get_top_members(bot, event.peer_id)
         return
         
