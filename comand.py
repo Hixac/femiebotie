@@ -6,6 +6,10 @@ from config import TG_API_ID, TG_API_HASH, TG_PHONE
 from telethon import TelegramClient
 from telethon.tl.types import PeerChannel
 from openrouter_api import api
+import aiohttp
+import aiofiles
+import validators
+from bs4 import BeautifulSoup
 
 # Глобальный кеш для клиента Telegram
 _tg_client = None
@@ -135,6 +139,41 @@ async def who_are_you(event, bot):
     if len(reply) == 0:
         return #add behaviour
     await who_am_i(reply[0], event.peer_id, bot)
+
+async def download_img(url, yt_id):
+    import os
+    filename = os.getcwd() + "/" + yt_id + '.png'
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                f = await aiofiles.open(filename, mode='wb')
+                await f.write(await resp.read())
+                await f.close()
+
+    return filename
+
+# https://www.youtube.com/shorts/x3lWKm9cE5E
+# https://www.youtube.com/watch?v=db67SLeT8IE&t=52s
+def get_yt_id(url):
+    start = url.find("shorts")
+    if start != -1:
+        start += len("shorts") + 1
+    else:
+        start = url.find("=") + 1        
+    return url[start:start+11]
+
+async def parse_yt_url(event, bot):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(event.message) as r:
+            soup = BeautifulSoup(await r.text(), "html.parser")
+            link = soup.find_all(name="title")[0]
+            title = str(link)
+            title = title.replace("<title>","")
+            title = title.replace("</title>","")
+
+            img = await download_img("https://img.youtube.com/vi/" + get_yt_id(event.message) + "/hqdefault.jpg", get_yt_id(event.message))
+            await bot.send_message(title[:-9], event.peer_id, photo_dir=img)
     
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 async def tag(event, bot):
@@ -150,6 +189,10 @@ async def tag(event, bot):
     tag = parts[0].lstrip("@").rstrip(",").lower()
     rest_msg = parts[1] if len(parts) > 1 else ""
 
+    if (msg.find("youtube.com") != -1 or msg.find("youtu.be")) and validators.url(event.message):
+        await parse_yt_url(event, bot)
+        return
+    
     if msg == "кто ты":
         await who_are_you(event, bot)
         return

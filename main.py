@@ -3,6 +3,7 @@ import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+import requests
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotMessageEvent, VkBotEventType
 import comand
@@ -16,7 +17,7 @@ class BotEvent:
     @property
     def conversation_message_id(self):
         return self.event.message['id']
-        
+    
     @property
     def raw(self):
         return self.event
@@ -66,24 +67,33 @@ class Bot:
         for i in self._longpoll.listen():
             self._last_event = BotEvent(i)
             yield BotEvent(i)
-
+            
     def get_raw_conversation_members(self, peer_id):
         if not isinstance(peer_id, int):
             raise ValueError("Restricted type")
         
         return self._session.method("messages.getConversationMembers", {"peer_id": peer_id})
-            
-    def send_message(self, msg, peer_id, reply_id=0):
-        if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(reply_id, int):
+
+    def get_upload_photo(self, direc: str) -> dict:
+        upload = vk_api.VkUpload(self._session)
+        temp = upload.photo_messages(direc)[0]
+        
+        return "photo" + str(temp["owner_id"]) + "_" + str(temp["id"])
+    
+    def send_message(self, msg, peer_id, reply_id=0, photo_dir=""):
+        if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(reply_id, int) or not isinstance(photo_dir, str):
             raise ValueError("Restricted type")
         if msg == "":
             msg = "Пустое сообщение"
+
+        if photo_dir != "":
+            photo_dir = self.get_upload_photo(photo_dir)
             
         params = {
             "peer_id": peer_id,
             "random_id": 0,
             "message": msg,
-            "attachment": ""
+            "attachment": photo_dir
         }
         
         if reply_id > 0:
@@ -96,9 +106,9 @@ class ThreadSafeBot:
         self._bot = bot
         self._loop = loop
         self._executor = executor
-
-    async def send_message(self, msg: str, peer_id: int, reply_id: int = 0):
-        await self._loop.run_in_executor(self._executor, self._bot.send_message, msg, peer_id, reply_id)
+        
+    async def send_message(self, msg: str, peer_id: int, reply_id: int = 0, photo_dir = ""):
+        await self._loop.run_in_executor(self._executor, self._bot.send_message, msg, peer_id, reply_id, photo_dir)
 
     async def get_raw_conversation_members(self, peer_id: int):
         return await self._loop.run_in_executor(self._executor, self._bot.get_raw_conversation_members, peer_id)
@@ -119,8 +129,9 @@ async def init_database(peer_id, safe_bot):
 async def process_input_async(event, safe_bot):
     if not db.is_chat_existing(event.peer_id):
         await init_database(event.peer_id, safe_bot)
-    await comand.tag(event, safe_bot)
-
+    if event.event_type == VkBotEventType.MESSAGE_NEW:
+        await comand.tag(event, safe_bot)
+        
 async def process_user(event):
     db.increment_msg_count(event.author_id, event.peer_id)
     
