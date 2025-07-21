@@ -107,3 +107,10 @@ def is_chat_existing(peer_id):
 def query(sql):
     cur.execute(sql)
     return cur.fetchall()
+
+def init_database(peer_id, vk_members):
+    profiles = vk_members['profiles']
+    admins = [i['member_id'] for i in vk_members['items'] if 'is_admin' in i and i['is_admin']]
+    owner = [i['member_id'] for i in vk_members['items'] if 'is_owner' in i and i['is_owner']][0]
+    for user in profiles:
+        add_user(user['id'], user['last_name'], user['first_name'], peer_id, is_admin=(True if user['id'] in admins else False), is_owner=(True if user['id'] == owner else False))

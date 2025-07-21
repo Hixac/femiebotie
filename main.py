@@ -1,155 +1,127 @@
-import db
-import asyncio
-import threading
-from concurrent.futures import ThreadPoolExecutor
+from bot_interface import Bot
+import error_handle as eh
+import openrouter_api
+import db, tg
 
-import requests
-import vk_api
-from vk_api.bot_longpoll import VkBotLongPoll, VkBotMessageEvent, VkBotEventType
-import comand
+bot = Bot()
 
-from config import GROUP_TOKEN, GROUP_ID
+@bot.comand("старт")
+def hello(event):
+    bot.send_message("Привет", event.peer_id)
 
-class BotEvent:
-    def __init__(self, event: VkBotMessageEvent):
-        self.event = event
+@bot.tag(bot.bot_name, "горк", "ГОРК", "говно")
+async def gork(event):
+    rest_msg = "".join(event.message.split()[1:])
+    content = await openrouter_api.api.async_query(rest_msg)
+    bot.send_message(content, event.peer_id)
+    await openrouter_api.cleanup()
 
-    @property
-    def conversation_message_id(self):
-        return self.event.message['id']
-    
-    @property
-    def raw(self):
-        return self.event
-        
-    @property
-    def event_type(self) -> VkBotEventType:
-        return self.event.type
-
-    @property
-    def reply_message(self) -> str:
-        if "reply_message" in self.event.message:
-            return (self.event.message["reply_message"]["from_id"], self.event.message["reply_message"]["text"])
-        return ()
-    
-    @property
-    def message(self) -> str:
-        return self.event.message["text"]
-
-    @property
-    def author_id(self) -> str:
-        return self.event.message["from_id"]
-
-    @property
-    def peer_id(self) -> int:
-        return self.event.message["peer_id"]
-
-class LongPoll(VkBotLongPoll):
-    def listen(self):
-        while True:
-            try:
-                for event in self.check():
-                    yield event
-            except Exception as e:
-                print(e)
-
-class Bot:
-    @property
-    def last_event(self):
-        return self._last_event
-    
-    def __init__(self):
-        self._session = vk_api.VkApi(token=GROUP_TOKEN)
-        self._longpoll = LongPoll(self._session, GROUP_ID)
-        self._last_event = None
-        
-    def get_event(self):
-        for i in self._longpoll.listen():
-            self._last_event = BotEvent(i)
-            yield BotEvent(i)
-            
-    def get_raw_conversation_members(self, peer_id):
-        if not isinstance(peer_id, int):
-            raise ValueError("Restricted type")
-        
-        return self._session.method("messages.getConversationMembers", {"peer_id": peer_id})
-
-    def get_upload_photo(self, direc: str) -> dict:
-        upload = vk_api.VkUpload(self._session)
-        temp = upload.photo_messages(direc)[0]
-        
-        return "photo" + str(temp["owner_id"]) + "_" + str(temp["id"])
-    
-    def send_message(self, msg, peer_id, reply_id=0, photo_dir=""):
-        if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(reply_id, int) or not isinstance(photo_dir, str):
-            raise ValueError("Restricted type")
-        if msg == "":
-            msg = "Пустое сообщение"
-
-        if photo_dir != "":
-            photo_dir = self.get_upload_photo(photo_dir)
-            
-        params = {
-            "peer_id": peer_id,
-            "random_id": 0,
-            "message": msg,
-            "attachment": photo_dir
-        }
-        
-        if reply_id > 0:
-            params["reply_to"] = reply_id
-        
-        self._session.method("messages.send", params)
-
-class ThreadSafeBot:
-    def __init__(self, bot: Bot, loop: asyncio.AbstractEventLoop, executor: ThreadPoolExecutor):
-        self._bot = bot
-        self._loop = loop
-        self._executor = executor
-        
-    async def send_message(self, msg: str, peer_id: int, reply_id: int = 0, photo_dir = ""):
-        await self._loop.run_in_executor(self._executor, self._bot.send_message, msg, peer_id, reply_id, photo_dir)
-
-    async def get_raw_conversation_members(self, peer_id: int):
-        return await self._loop.run_in_executor(self._executor, self._bot.get_raw_conversation_members, peer_id)
-        
-def run_listener(queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
-    bot_listener = Bot()
-    for event in bot_listener.get_event():
-        asyncio.run_coroutine_threadsafe(queue.put(event), loop)
-
-async def init_database(peer_id, safe_bot):
-    members = await safe_bot.get_raw_conversation_members(peer_id)
-    profiles = members['profiles']
-    admins = [i['member_id'] for i in members['items'] if 'is_admin' in i and i['is_admin']]
-    owner = [i['member_id'] for i in members['items'] if 'is_owner' in i and i['is_owner']][0]
-    for user in profiles:
-        db.add_user(user['id'], user['last_name'], user['first_name'], peer_id, is_admin=(True if user['id'] in admins else False), is_owner=(True if user['id'] == owner else False))
-        
-async def process_input_async(event, safe_bot):
+@bot.new_message
+def init_chat(event):
     if not db.is_chat_existing(event.peer_id):
-        await init_database(event.peer_id, safe_bot)
-    if event.event_type == VkBotEventType.MESSAGE_NEW:
-        await comand.tag(event, safe_bot)
-        
-async def process_user(event):
+        members = bot.get_raw_conversation_members(event.peer_id)
+        db.init_database(event.peer_id, members)
+    
+@bot.new_message
+def increment_msg_count(event):
     db.increment_msg_count(event.author_id, event.peer_id)
-    
-async def main():
-    queue = asyncio.Queue()
-    loop = asyncio.get_running_loop()
-    executor = ThreadPoolExecutor(max_workers=10)
-    
-    bot_sender = Bot()
-    safe_bot = ThreadSafeBot(bot_sender, loop, executor)
-    
-    thread = threading.Thread(target=run_listener, args=(queue, loop), daemon=True)
-    thread.start()
-    
-    while True:
-        event = await queue.get()
-        asyncio.create_task(process_input_async(event, safe_bot))
-        asyncio.create_task(process_user(event))
 
+@bot.comand("/активы")
+def top_users(event):
+    
+    def fancy_top(num, sec_name, name, msg_count):
+        template = f"{name} {sec_name} написал {msg_count} сообщений"
+        fire = "🔥"; snowman = "⛄"; flower = "🌼"; nl = "\n"
+        if num == 1:
+            return fire * 3 + template + fire * 3 + nl
+        if num == 2:
+            return snowman * 2 + template + snowman * 2 + nl
+        if num == 3:
+            return flower + template + flower + nl
+        if num == 4:
+            return "\n\n😽ОСТАЛЬНЫМ СПАСИБКИ ЗА АКТИВ😽\n\n" + f"{str(num)}. " + template + nl
+
+        return f"{str(num)}. " + template + nl
+
+    
+    mems = db.get_top_members(event.peer_id)
+    ans = "🐒🦄 НАШИ ТОПОВЫЕ АКТИВЧИКИ ⭐\n\n"
+    for i in range(min(len(mems), 10)):
+        vk_id = mems[i].vk_id; msg_count = mems[i].msg_count
+        person = db.get_user(vk_id)
+        ans += fancy_top(i + 1, person.sec_name, person.name, msg_count)
+
+    bot.send_message(ans, event.peer_id)
+
+@bot.comand("/админы")
+def admins(event):
+    mems = db.get_admin_members(event.peer_id)
+    ans = "Список админов\n\n"
+    for i in range(len(mems)):
+        vk_id = mems[i].vk_id
+        person = db.get_user(vk_id)
+        ans += f"{i + 1}. {person.name} {person.sec_name}\n"
+    
+    bot.send_message(ans, event.peer_id)
+
+@bot.comand("/основатель")
+def owner(event):
+    owner = db.get_owner(event.peer_id)
+    if owner is None:
+        bot.send_message("Основателем является паблик", event.peer_id)
+        return
+        
+    ans = "Основатель: "
+    vk_id = owner.vk_id
+    person = db.get_user(vk_id)
+    ans += f"{person.name} {person.sec_name}"
+    
+    bot.send_message(ans, event.peer_id)
+
+@bot.comand("кто я")
+def who_am_i(event):
+    base_info = db.get_user(event.author_id)
+    user_chat_info = db.get_user_chat(event.author_id, event.peer_id)
+
+    ans = ""
+    ans += "👀Информация об " + base_info.sec_name + " " + base_info.name
+    ans += "\n\nНаписал сообщений " + str(user_chat_info.msg_count)
+    if user_chat_info.is_owner:
+        ans += "\nЯвляется основателем!!!✍"
+    else: ans += "\nНе является основателем...😪"
+    if user_chat_info.is_admin:
+        ans += "\nЯвляется админчиком!!!🤩"
+    else: ans += "\nНе является админом...😰"
+    
+    bot.send_message(ans, event.peer_id)
+
+@bot.on_reply
+def who_are_you(event):
+    author_id = event.reply_message[0]
+    if author_id < 0:
+        bot.send_message("Ты че до паблика доебался", event.peer_id)
+        return
+    
+    if event.message.lower() == "кто ты":
+        base_info = db.get_user(author_id)
+        user_chat_info = db.get_user_chat(author_id, event.peer_id)
+
+        ans = ""
+        ans += "👀Информация об " + base_info.sec_name + " " + base_info.name
+        ans += "\n\nНаписал сообщений " + str(user_chat_info.msg_count)
+        if user_chat_info.is_owner:
+            ans += "\nЯвляется основателем!!!✍"
+        else: ans += "\nНе является основателем...😪"
+        if user_chat_info.is_admin:
+            ans += "\nЯвляется админчиком!!!🤩"
+        else: ans += "\nНе является админом...😰"
+        
+        bot.send_message(ans, event.peer_id)
+        
+@bot.tag("ньюсач")
+async def send_tg_post(event):
+    post = await tg.get_post("ru2ch")
+    bot.send_message(post, event.peer_id)
+        
 if __name__ == "__main__":
-    asyncio.run(main())
+    bot.run_forever()

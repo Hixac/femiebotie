@@ -6,10 +6,11 @@ import config
 
 class OpenrouterAPI:
     def __init__(self):
-        self._api_key = config.OPEN_ROUTER_API_KEY_1
+        self._api_keys = [config.OPEN_ROUTER_API_KEY_1, config.OPEN_ROUTER_API_KEY_2]
         self._url = "https://openrouter.ai/api/v1/chat/completions"
         self._session = None  # Для асинхронной сессии
-
+        self._used_key = 0
+        
     def query(self, prompt):
         """Синхронная версия запроса"""
         headers = {
@@ -36,7 +37,7 @@ class OpenrouterAPI:
     async def async_query(self, prompt):
         """Асинхронная версия запроса"""
         headers = {
-            'Authorization': f'Bearer {self._api_key}',
+            'Authorization': f'Bearer {self._api_keys[self._used_key]}',
             'Content-Type': 'application/json'
         }
         payload = {
@@ -56,7 +57,12 @@ class OpenrouterAPI:
                 data = await response.json()
                 return data['choices'][0]['message']['content']
         except aiohttp.ClientError as e:
-            return f"Ошибка сетевого запроса: {e}"
+            if len(self._api_keys) - 1 > self._used_key:
+                self._used_key += 1
+                return await self.async_query(prompt)
+            else:
+                self._used_key = 0
+                return f"Ошибка сетевого запроса: {e}"
         except KeyError:
             return "Ошибка формата ответа API"
         except Exception as e:

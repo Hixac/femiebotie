@@ -24,7 +24,7 @@ def handle_exception(default_response=empty, conn_error=empty):
 
 async def connection_response(e, func, *args, **kwargs):
     max_retries = 3
-    print("Getting here")
+    print("здесь")
     for attempt in range(max_retries):
         try:
             return await func(*args, **kwargs)
