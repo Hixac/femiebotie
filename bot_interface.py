@@ -52,11 +52,13 @@ class ComandType(Enum):
     IS_COMAND = 2
     NEW_MESSAGE = 3
     ON_REPLY = 4
+    ON_REPLY_TAG = 5
+    ON_REPLY_SELF = 6
     
 @dataclass
 class Comand:
     comand_type: ComandType
-    msg: str
+    msg: str | tuple
     doer: Callable | CoroutineType
 
 class Bot:
@@ -115,8 +117,16 @@ class Bot:
             case ComandType.ON_REPLY:
                 if len(event.reply_message) != 0:
                     await call(comand.doer(event))
+            case ComandType.ON_REPLY_TAG:
+                if len(event.reply_message) != 0 and any([event.message.lower().startswith(i) for i in comand.msg]):
+                    await call(comand.doer(event))
             case ComandType.NEW_MESSAGE:
                 await call(comand.doer(event))
+            case ComandType.ON_REPLY_SELF:
+                if len(event.reply_message) == 0 or event.reply_message[0] != -int(GROUP_ID):
+                    return
+                if comand.msg == "" or event.reply_message[1][:len(comand.msg)] == comand.msg:
+                    await call(comand.doer(event))
                         
     def listen(self):
         for event in self.get_event():
@@ -176,6 +186,17 @@ class Bot:
         self._comands.append(Comand(comand_type=ComandType.ON_REPLY, msg="", doer=func))
         return func
 
+    def on_reply_tag(self, *args):
+        def decorator(func):
+            self._comands.append(Comand(comand_type=ComandType.ON_REPLY_TAG, msg=args, doer=func))
+            return func
+        return decorator
+
+    def on_reply_self(self, header: str = ""): # decorator
+        def decorator(func):
+            self._comands.append(Comand(comand_type=ComandType.ON_REPLY_SELF, msg=header, doer=func))
+            return func
+        return decorator
     
 class LongPoll(VkBotLongPoll):
     def listen(self):

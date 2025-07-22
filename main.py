@@ -5,9 +5,47 @@ import db, tg
 
 bot = Bot()
 
-@bot.comand("старт")
-def hello(event):
-    bot.send_message("Привет", event.peer_id)
+@bot.on_reply_self("СМЕНА ИМЕНИ")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def changer(event):
+    if len(event.message) >= 50:
+        bot.send_message("Слишком длинное имя, надо ужаться в 50 символов, еблан.", event.peer_id)
+        return
+    db.change_sec_name(event.author_id, event.message)
+    bot.send_message("Сменил имя на ДЫРЯВЫЙ... Шучу. Изменил имя.", event.peer_id)
+
+@bot.on_reply_self("СМЕНА ФАМИЛИИ")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def changer(event):
+    if len(event.message) >= 50:
+        bot.send_message("Слишком длинная фамилия, надо ужаться в 50 символов, еблан.", event.peer_id)
+        return
+    db.change_name(event.author_id, event.message)
+    bot.send_message("Сменил фамилию на ДОЛБАЕБ... Шучу. Изменил фамилию.", event.peer_id)
+    
+@bot.on_reply_self("СТАТЫ")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def stats_check(event):
+    if event.message == "1":
+        bot.send_message("СМЕНА ИМЕНИ\nКакое имя хочешь? Ответь мне, чтобы изменить.", event.peer_id)
+    elif event.message == "2":
+        bot.send_message("СМЕНА ФАМИЛИИ\nКакую фамилию хочешь? Ответь мне, чтобы изменить.", event.peer_id)
+
+@bot.on_reply_tag("шлепнуть", "шлёпнуть", "дать по жопе")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def take_it(event):
+    from random import choice
+    
+    user_1 = db.get_user(event.author_id)
+    user_2 = db.get_user(event.reply_message[0])
+
+    name_1 = user_1.name.capitalize()
+    name_2 = user_2.name.capitalize()
+    
+    answers = [name_1 + " дал жёстко по жопе, что аж " + name_2 + " покраснел/а от стыда и злости. Дальше они целовались в засос."]
+    answers.append(name_1 + " не смог попасть по жопе " + name_2 + ", из-за чего " + name_2 + " продырявил/а жопу " + name_1)
+    
+    bot.send_message(choice(answers), event.peer_id)
 
 @bot.tag(bot.bot_name, "горк", "ГОРК")
 async def gork(event):
@@ -87,8 +125,33 @@ def who_am_i(event):
     base_info = db.get_user(event.author_id)
     user_chat_info = db.get_user_chat(event.author_id, event.peer_id)
 
+    ans = "СТАТЫ\n"
+    ans += "👀Информация об " + base_info.name + " " + base_info.sec_name
+    ans += "\n\nНаписал сообщений " + str(user_chat_info.msg_count)
+    if user_chat_info.is_owner:
+        ans += "\nЯвляется основателем!!!✍"
+    else: ans += "\nНе является основателем...😪"
+    if user_chat_info.is_admin:
+        ans += "\nЯвляется админчиком!!!🤩"
+    else: ans += "\nНе является админом...😰"
+    ans += "\n\n1. Сменить имя"
+    ans += "\n2. Сменить фамилию"
+    
+    bot.send_message(ans, event.peer_id)
+
+@bot.on_reply_tag("кто ты", "кто ты такой", "кто есть", "какая масть")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def who_are_you(event):
+    author_id = event.reply_message[0]
+    if author_id < 0:
+        bot.send_message("Ты че до паблика доебался", event.peer_id)
+        return
+    
+    base_info = db.get_user(author_id)
+    user_chat_info = db.get_user_chat(author_id, event.peer_id)
+    
     ans = ""
-    ans += "👀Информация об " + base_info.sec_name + " " + base_info.name
+    ans += "👀Информация об " + base_info.name + " " + base_info.sec_name
     ans += "\n\nНаписал сообщений " + str(user_chat_info.msg_count)
     if user_chat_info.is_owner:
         ans += "\nЯвляется основателем!!!✍"
@@ -98,35 +161,11 @@ def who_am_i(event):
     else: ans += "\nНе является админом...😰"
     
     bot.send_message(ans, event.peer_id)
-
-@bot.on_reply
-@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
-def who_are_you(event):
-    author_id = event.reply_message[0]
-    if event.message.lower() == "кто ты" and author_id < 0:
-        bot.send_message("Ты че до паблика доебался", event.peer_id)
-        return
-    
-    if event.message.lower() == "кто ты":
-        base_info = db.get_user(author_id)
-        user_chat_info = db.get_user_chat(author_id, event.peer_id)
-
-        ans = ""
-        ans += "👀Информация об " + base_info.sec_name + " " + base_info.name
-        ans += "\n\nНаписал сообщений " + str(user_chat_info.msg_count)
-        if user_chat_info.is_owner:
-            ans += "\nЯвляется основателем!!!✍"
-        else: ans += "\nНе является основателем...😪"
-        if user_chat_info.is_admin:
-            ans += "\nЯвляется админчиком!!!🤩"
-        else: ans += "\nНе является админом...😰"
-        
-        bot.send_message(ans, event.peer_id)
         
 @bot.tag("ньюсач", "топор", "униан", "поздняков", "баебы", "баёбы")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 async def send_tg_post(event):
-    msg_list = event.message.split()
+    msg_list = event.message.lower().split()
     tag = msg_list[0]
     arg = msg_list[1] if len(msg_list) > 1 else None
 

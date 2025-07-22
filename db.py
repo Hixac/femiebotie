@@ -82,6 +82,12 @@ def get_user_chat(vk_id, peer_id):
 def add_admin(vk_id, peer_id):
     cur.execute(f"UPDATE people_chat SET is_admin = TRUE WHERE vk_id={vk_id} AND peer_id={peer_id}")
 
+def change_name(vk_id, new_name: str):
+    cur.execute(f"UPDATE people SET name = '{new_name}' WHERE vk_id={vk_id}")
+
+def change_sec_name(vk_id, new_sec_name: str):
+    cur.execute(f"UPDATE people SET sec_name = '{new_sec_name}' WHERE vk_id={vk_id}")
+    
 def increment_msg_count(vk_id, peer_id):
     cur.execute(f"UPDATE people_chat SET msg_count = msg_count + 1 WHERE vk_id={vk_id} AND peer_id={peer_id}")
 
