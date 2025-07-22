@@ -16,7 +16,7 @@ async def get_tg_client():
         await _tg_client.start(phone=TG_PHONE)
     return _tg_client
 
-async def get_post(name, index=1, is_rand=False):
+async def get_post(name, index=0, is_rand=False):
     """Асинхронное получение поста из Telegram канала"""
     if not isinstance(is_rand, bool):
         raise ValueError("is_rand must be boolean")
@@ -34,7 +34,7 @@ async def get_post(name, index=1, is_rand=False):
         return random.choice(messages) if messages else "Не найдено сообщений"
     
     messages = []
-    async for msg in client.iter_messages(channel, limit=index):
+    async for msg in client.iter_messages(channel, limit=index+1):
         if msg.text:
             messages.append(msg.text)
 

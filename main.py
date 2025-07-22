@@ -128,12 +128,14 @@ def who_are_you(event):
 async def send_tg_post(event):
     msg_list = event.message.split()
     tag = msg_list[0]
-    arg = msg_list[1]
+    arg = msg_list[1] if len(msg_list) > 1 else None
 
-    index = 1
+    index = 0
     is_rand = False
-    
-    if arg.isnumeric():
+
+    if arg is None:
+        pass
+    elif arg.isnumeric():
         index = int(arg)
     elif arg == "рандом":
         is_rand = True
