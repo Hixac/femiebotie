@@ -103,7 +103,7 @@ def who_am_i(event):
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def who_are_you(event):
     author_id = event.reply_message[0]
-    if author_id < 0:
+    if event.message.lower() == "кто ты" and author_id < 0:
         bot.send_message("Ты че до паблика доебался", event.peer_id)
         return
     
@@ -154,6 +154,66 @@ async def send_tg_post(event):
         post = await tg.get_post(tg.convert_id(1732054517), index, is_rand)
     
     bot.send_message(post, event.peer_id)
+
+@bot.tag("sql")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def sql(event):
+    rest_msg = event.message[len("sql")+1:]
+    bot.send_message(str(db.query(rest_msg)), event.peer_id)
+
+@bot.new_message
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def process_yt(event):
+    from urllib.parse import urlparse, parse_qs, urlencode
+    from urllib.request import urlopen
+    from bs4 import BeautifulSoup
+    import re
+    
+    def video_id(value):
+        query = urlparse(value)
+        if query.hostname == 'youtu.be':
+            return query.path[1:]
+        if query.hostname in ('www.youtube.com', 'youtube.com', 'm.youtube.com'):
+            if query.path == '/watch':
+                p = parse_qs(query.query)
+                return p['v'][0]
+            if query.path[:7] == '/embed/':
+                return query.path.split('/')[2]
+            if query.path[:3] == '/v/':
+                return query.path.split('/')[2]
+            if query.path[:8] == '/shorts/':
+                return query.path.split('/')[2]
+        return None
+
+    def get_title(url: str):
+        with urlopen(url) as response:
+            response_text = response.read()
+            data = response_text.decode()
+            soup = BeautifulSoup(data, features="html.parser")
+            title = soup.find_all(name="title")[0].text
+            return title
+
+    def download_image(url, vid):
+        import os
+        filename = os.getcwd() + "/" + vid + '.png'
+        
+        with urlopen(url) as response:
+            f = open(filename, mode='wb')
+            f.write(response.read())
+            f.close()
+        return filename
+    
+    msg = event.message
+    url = re.search(r"(?P<url>https?://[^\s]+)", msg)
+    if url != None and video_id(url.group("url")) != None:
+        url = url.group("url")
+        vid = video_id(url)
+
+        title = get_title("https://www.youtube.com/watch?v=" + vid)
+        filename = download_image("https://img.youtube.com/vi/" + vid + "/hqdefault.jpg", vid)
+
+        bot.send_message(title, event.peer_id, photo_dir=filename)
+        
     
 if __name__ == "__main__":
     bot.run_forever()
