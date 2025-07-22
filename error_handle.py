@@ -6,20 +6,25 @@ def empty(e, *args, **kwargs):
     pass
 
 def handle_exception(default_response=empty, conn_error=empty):
+    async def call(callee):
+        if asyncio.iscoroutine(callee):
+            await callee
+    
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             try:
-                return await func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    return await result
+                else:
+                    return result
             except ConnectionError as e:
-                result = conn_error(e, func, *args, **kwargs)
-                if asyncio.iscoroutine(result):
-                    await result
+                await call(conn_error(e, func, *args, **kwargs))
             except Exception as e:
-                result = default_response(e, *args, **kwargs)
-                if asyncio.iscoroutine(result):
-                    await result
+                await call(default_response(e, *args, **kwargs))
         return wrapper
+    
     return decorator
 
 async def connection_response(e, func, *args, **kwargs):
@@ -36,8 +41,7 @@ async def connection_response(e, func, *args, **kwargs):
                 print("Сервер решил послать нахуй куда подальше")
                 return
             
-async def automatic_response(e, event, bot):
+async def automatic_response(e, event):
     import traceback
     print(f"Ошибка обработки команды: {e}")
     traceback.print_exc()
-    await bot.send_message("⚠️ Произошла ошибка при обработке команды", event.peer_id)

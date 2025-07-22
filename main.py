@@ -9,7 +9,7 @@ bot = Bot()
 def hello(event):
     bot.send_message("Привет", event.peer_id)
 
-@bot.tag(bot.bot_name, "горк", "ГОРК", "говно")
+@bot.tag(bot.bot_name, "горк", "ГОРК")
 async def gork(event):
     rest_msg = "".join(event.message.split()[1:])
     content = await openrouter_api.api.async_query(rest_msg)
@@ -27,6 +27,7 @@ def increment_msg_count(event):
     db.increment_msg_count(event.author_id, event.peer_id)
 
 @bot.comand("/активы")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def top_users(event):
     
     def fancy_top(num, sec_name, name, msg_count):
@@ -54,6 +55,7 @@ def top_users(event):
     bot.send_message(ans, event.peer_id)
 
 @bot.comand("/админы")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def admins(event):
     mems = db.get_admin_members(event.peer_id)
     ans = "Список админов\n\n"
@@ -65,6 +67,7 @@ def admins(event):
     bot.send_message(ans, event.peer_id)
 
 @bot.comand("/основатель")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def owner(event):
     owner = db.get_owner(event.peer_id)
     if owner is None:
@@ -79,6 +82,7 @@ def owner(event):
     bot.send_message(ans, event.peer_id)
 
 @bot.comand("кто я")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def who_am_i(event):
     base_info = db.get_user(event.author_id)
     user_chat_info = db.get_user_chat(event.author_id, event.peer_id)
@@ -96,6 +100,7 @@ def who_am_i(event):
     bot.send_message(ans, event.peer_id)
 
 @bot.on_reply
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def who_are_you(event):
     author_id = event.reply_message[0]
     if author_id < 0:
@@ -118,10 +123,37 @@ def who_are_you(event):
         
         bot.send_message(ans, event.peer_id)
         
-@bot.tag("ньюсач")
+@bot.tag("ньюсач", "топор", "униан", "поздняков", "баебы", "баёбы")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 async def send_tg_post(event):
-    post = await tg.get_post("ru2ch")
+    msg_list = event.message.split()
+    tag = msg_list[0]
+    arg = msg_list[1]
+
+    index = 1
+    is_rand = False
+    
+    if arg.isnumeric():
+        index = int(arg)
+    elif arg == "рандом":
+        is_rand = True
+    else:
+        bot.send_message("Был передан неизвестный аргумент. Динаху.", event.peer_id)
+        return
+    
+    post = ""
+    if tag == "ньюсач":
+        post = await tg.get_post("ru2ch", index, is_rand)
+    elif tag == "униан":
+        post = await tg.get_post("uniannet", index, is_rand)
+    elif tag == "баебы" or tag == "баёбы":
+        post = await tg.get_post("dolbaepiss", index, is_rand)
+    elif tag == "топор":
+        post = await tg.get_post(tg.convert_id(1237513492), index, is_rand)
+    elif tag == "поздняков":
+        post = await tg.get_post(tg.convert_id(1732054517), index, is_rand)
+    
     bot.send_message(post, event.peer_id)
-        
+    
 if __name__ == "__main__":
     bot.run_forever()

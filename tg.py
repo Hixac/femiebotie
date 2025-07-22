@@ -2,6 +2,8 @@ from config import TG_API_ID, TG_API_HASH, TG_PHONE
 from telethon import TelegramClient
 from telethon.tl.types import PeerChannel
 
+import random
+
 convert_id = PeerChannel
 
 _tg_client = None
@@ -35,4 +37,5 @@ async def get_post(name, index=1, is_rand=False):
     async for msg in client.iter_messages(channel, limit=index):
         if msg.text:
             messages.append(msg.text)
+
     return messages[-1] if messages else "Не найдено сообщений"

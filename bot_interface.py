@@ -110,7 +110,7 @@ class Bot:
                 if event.message.lower() == comand.msg:
                     await call(comand.doer(event))
             case ComandType.IS_TAG:
-                if any([event.message.startswith(i) for i in comand.msg]):
+                if any([event.message.lower().startswith(i) for i in comand.msg]):
                     await call(comand.doer(event))
             case ComandType.ON_REPLY:
                 if len(event.reply_message) != 0:
