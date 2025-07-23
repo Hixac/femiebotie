@@ -5,31 +5,79 @@ import db, tg
 
 bot = Bot()
 
+@bot.comand("слотмашина", "слот машина")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def slot_machine(event):
+
+    if db.get_coins(event.author_id, event.peer_id) < 10:
+        bot.send_message("Ебать ты нищуган, съеби с казино, тебе тут не рады.", event.peer_id)
+        return
+    db.sub_coins(event.author_id, event.peer_id, 10)
+    
+    from random import choice
+    
+    emojis = ["✅", "🦈", "⛳", "🤹", "♀", "🇷🇺"]
+
+    e1 = choice(emojis)
+    e2 = choice(emojis)
+    e3 = choice(emojis)
+    
+    ans = f"""+-----+-----+-----+
+| {e1} | {e2} | {e3} |
++-----+-----+-----+"""
+    
+    bot.send_message(ans, event.peer_id)
+    
+    if e1 + e2 + e3 == "🇷🇺🇷🇺🇷🇺":
+        db.add_coins(event.author_id, event.peer_id, 10000)
+        bot.send_message("ВЫ ВЫИГРАЛИ СУПЕРГОЙДА ПРИЗ!! ВЫИГРЫШ СОСТАВЛЯЕТ 10000 САТОШ.", event.peer_id)
+    elif e1 == e2 and e2 == e3:
+        db.add_coins(event.author_id, event.peer_id, 100)
+        bot.send_message("Победа! Вам присуждается 100 сатош.", event.peer_id)
+
 @bot.on_reply_self("СМЕНА ИМЕНИ")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def changer(event):
+    if db.get_coins(event.author_id, event.peer_id) < 1000:
+        bot.send_message("Ты дохуя умный думаешь? Нихуя менять не буду.", event.peer_id)
+        return
+    
     if len(event.message) >= 50:
         bot.send_message("Слишком длинное имя, надо ужаться в 50 символов, еблан.", event.peer_id)
         return
+
+    db.sub_coins(event.author_id, event.peer_id, 1000)
     db.change_sec_name(event.author_id, event.message)
     bot.send_message("Сменил имя на ДЫРЯВЫЙ... Шучу. Изменил имя.", event.peer_id)
 
 @bot.on_reply_self("СМЕНА ФАМИЛИИ")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def changer(event):
+    if db.get_coins(event.author_id, event.peer_id) < 1000:
+        bot.send_message("Ты дохуя умный думаешь? Нихуя менять не буду.", event.peer_id)
+        return
+    
     if len(event.message) >= 50:
         bot.send_message("Слишком длинная фамилия, надо ужаться в 50 символов, еблан.", event.peer_id)
         return
+    
+    db.sub_coins(event.author_id, event.peer_id, 1000)
     db.change_name(event.author_id, event.message)
     bot.send_message("Сменил фамилию на ДОЛБАЕБ... Шучу. Изменил фамилию.", event.peer_id)
     
 @bot.on_reply_self("СТАТЫ")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def stats_check(event):
+    if db.get_coins(event.author_id, event.peer_id) < 1000:
+        bot.send_message("НЕДОСТАТОЧНО СРЕДСТВ, СЪЕБИ ПО-ЧЕСНОКУ, НЕ ПОЗОРЬСЯ", event.peer_id)
+        return
+    
     if event.message == "1":
         bot.send_message("СМЕНА ИМЕНИ\nКакое имя хочешь? Ответь мне, чтобы изменить.", event.peer_id)
     elif event.message == "2":
         bot.send_message("СМЕНА ФАМИЛИИ\nКакую фамилию хочешь? Ответь мне, чтобы изменить.", event.peer_id)
+    elif event.message == "3":
+        bot.send_message("У БОМЖА НЕДОСТАТОЧНО СРЕДСТВ", event.peer_id)
 
 @bot.on_reply_tag("шлепнуть", "шлёпнуть", "дать по жопе")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
@@ -63,6 +111,7 @@ def init_chat(event):
 @bot.new_message
 def increment_msg_count(event):
     db.increment_msg_count(event.author_id, event.peer_id)
+    db.add_coins(event.author_id, event.peer_id, 1)
 
 @bot.comand("/активы")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
@@ -119,7 +168,7 @@ def owner(event):
     
     bot.send_message(ans, event.peer_id)
 
-@bot.comand("кто я")
+@bot.comand("кто я", "статы")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def who_am_i(event):
     base_info = db.get_user(event.author_id)
@@ -134,8 +183,10 @@ def who_am_i(event):
     if user_chat_info.is_admin:
         ans += "\nЯвляется админчиком!!!🤩"
     else: ans += "\nНе является админом...😰"
-    ans += "\n\n1. Сменить имя"
-    ans += "\n2. Сменить фамилию"
+    ans += "\nИмеет " + str(db.get_coins(event.author_id, event.peer_id)) + " сатоши"
+    ans += "\n\n1. Сменить имя. Цена 1000 сатоши"
+    ans += "\n2. Сменить фамилию. Цена 1000 сатоши"
+    ans += "\n3. СТАТЬ ВИП. ЦЕНА 100000 САТОШИ"
     
     bot.send_message(ans, event.peer_id)
 
@@ -159,6 +210,7 @@ def who_are_you(event):
     if user_chat_info.is_admin:
         ans += "\nЯвляется админчиком!!!🤩"
     else: ans += "\nНе является админом...😰"
+    ans += "\nИмеет " + str(db.get_coins(event.reply_message[0], event.peer_id)) + " сатоши"
     
     bot.send_message(ans, event.peer_id)
         

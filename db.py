@@ -34,6 +34,7 @@ def init_user_chat(*args):
     d["is_admin"] = args[3]
     d["is_owner"] = args[4]
     d["msg_count"] = args[5]
+    d["coins"] = args[6]
     
     return PrototypedDict(d)
 
@@ -55,7 +56,8 @@ vk_id INTEGER NOT NULL REFERENCES people(vk_id),
 peer_id INTEGER NOT NULL REFERENCES chat(peer_id),
 is_admin BOOLEAN DEFAULT FALSE,
 is_owner BOOLEAN DEFAULT FALSE,
-msg_count INTEGER DEFAULT 0
+msg_count INTEGER DEFAULT 0,
+coins INTEGER DEFAULT 0
 )""")
 
 #cur.execute(f"""UPDATE people_chat SET msg_count = 20 WHERE vk_id=766134059""")
@@ -105,6 +107,19 @@ def get_owner(peer_id):
     if o is None:
         return None
     return init_user_chat(*o)
+
+def sub_coins(vk_id, peer_id, num):
+    if get_coins(vk_id, peer_id) - num < 0:
+        raise ValueError("Отрицательное число")
+    
+    cur.execute(f"UPDATE people_chat SET coins = coins - {num} WHERE vk_id={vk_id} AND peer_id={peer_id}")
+
+def add_coins(vk_id, peer_id, num):
+    cur.execute(f"UPDATE people_chat SET coins = coins + {num} WHERE vk_id={vk_id} AND peer_id={peer_id}")
+
+def get_coins(vk_id, peer_id):
+    cur.execute(f"SELECT coins FROM people_chat WHERE vk_id={vk_id} AND peer_id={peer_id}")
+    return cur.fetchone()[0]
 
 def is_chat_existing(peer_id):
     cur.execute(f"SELECT * FROM chat WHERE peer_id={peer_id}")

@@ -36,7 +36,7 @@ class BotEvent:
     
     @property
     def message(self) -> str:
-        return self.event.message["text"]
+        return self.event.message["text"] if self.event.message["text"] else ""
 
     @property
     def author_id(self) -> str:
@@ -109,7 +109,7 @@ class Bot:
         
         match comand.comand_type:
             case ComandType.IS_COMAND:
-                if event.message.lower() == comand.msg:
+                if any([event.message.lower() == i for i in comand.msg]):
                     await call(comand.doer(event))
             case ComandType.IS_TAG:
                 if any([event.message.lower().startswith(i) for i in comand.msg]):
@@ -166,9 +166,9 @@ class Bot:
                 
         self._session.method("messages.send", params)
 
-    def comand(self, raw_msg: str):
+    def comand(self, *args):
         def decorator(func):
-            self._comands.append(Comand(comand_type=ComandType.IS_COMAND, msg=raw_msg, doer=func))
+            self._comands.append(Comand(comand_type=ComandType.IS_COMAND, msg=args, doer=func))
             return func
         return decorator
 
