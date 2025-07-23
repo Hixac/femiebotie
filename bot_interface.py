@@ -36,7 +36,7 @@ class BotEvent:
     
     @property
     def message(self) -> str:
-        return self.event.message["text"] if self.event.message["text"] else ""
+        return self.event.message["text"] if "text" in self.event.message else ""
 
     @property
     def author_id(self) -> str:
