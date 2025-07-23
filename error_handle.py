@@ -5,10 +5,12 @@ from functools import wraps
 def empty(e, *args, **kwargs):
     pass
 
+async def _call(callee):
+    if asyncio.iscoroutine(callee):
+        await callee
+        
 def handle_exception(default_response=empty, conn_error=empty):
-    async def call(callee):
-        if asyncio.iscoroutine(callee):
-            await callee
+    
     
     def decorator(func):
         @wraps(func)
@@ -20,19 +22,18 @@ def handle_exception(default_response=empty, conn_error=empty):
                 else:
                     return result
             except ConnectionError as e:
-                await call(conn_error(e, func, *args, **kwargs))
+                await _call(conn_error(e, func, *args, **kwargs))
             except Exception as e:
-                await call(default_response(e, *args, **kwargs))
+                await _call(default_response(e, *args, **kwargs))
         return wrapper
     
     return decorator
 
 async def connection_response(e, func, *args, **kwargs):
     max_retries = 3
-    print("здесь")
     for attempt in range(max_retries):
         try:
-            return await func(*args, **kwargs)
+            return await _call(func(*args, **kwargs))
         except Exception as e:
             if attempt < max_retries - 1:
                 delay = 2 ** attempt
