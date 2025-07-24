@@ -1,4 +1,5 @@
 from bot_interface import Bot
+from async_stuff import throttle
 import error_handle as eh
 import openrouter_api
 import db, tg
@@ -214,7 +215,7 @@ def who_are_you(event):
     
     bot.send_message(ans, event.peer_id)
         
-@bot.tag("ньюсач", "топор", "униан", "поздняков", "баебы", "баёбы")
+@bot.tag("ньюсач", "топор", "униан", "поздняков", "баебы", "баёбы") # TODO: fix index issue
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 async def send_tg_post(event):
     msg_list = event.message.lower().split()
@@ -255,8 +256,9 @@ def sql(event):
     bot.send_message(str(db.query(rest_msg)), event.peer_id)
 
 @bot.new_message
+@throttle(interval_seconds=5.0)
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
-def process_yt(event):
+async def process_yt(event):    
     from urllib.parse import urlparse, parse_qs, urlencode
     from urllib.request import urlopen
     from bs4 import BeautifulSoup
@@ -306,7 +308,7 @@ def process_yt(event):
         filename = download_image("https://img.youtube.com/vi/" + vid + "/hqdefault.jpg", vid)
 
         bot.send_message(title, event.peer_id, photo_dir=filename)
-        
+
     
 if __name__ == "__main__":
     bot.run_forever()

@@ -36,7 +36,7 @@ class BotEvent:
     
     @property
     def message(self) -> str:
-        return self.event.message["text"] if "text" in self.event.message else ""
+        return self.event.message["text"] if not (self.event is None) else ""
 
     @property
     def author_id(self) -> str:
@@ -127,7 +127,7 @@ class Bot:
                     return
                 if comand.msg == "" or event.reply_message[1][:len(comand.msg)] == comand.msg:
                     await call(comand.doer(event))
-                        
+                    
     def listen(self):
         for event in self.get_event():
             asyncio.run_coroutine_threadsafe(self._queue.put(event), self._loop)
