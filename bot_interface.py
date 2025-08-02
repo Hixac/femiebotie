@@ -53,13 +53,17 @@ class ComandType(Enum):
     NEW_MESSAGE = 3
     ON_REPLY = 4
     ON_REPLY_TAG = 5
-    ON_REPLY_SELF = 6
+    HEADER = 6
+    HEADER_TAG = 7
+    HEADER_COMAND = 8
+    IS_TAG_ARGUMENTED = 9
     
 @dataclass
 class Comand:
     comand_type: ComandType
-    msg: str | tuple
+    msg: str | int
     doer: Callable | CoroutineType
+    args: tuple
 
 class Bot:
     def __init__(self):
@@ -86,46 +90,67 @@ class Bot:
 
     async def _process_comands(self, event: BotEvent):
         for i in self._comands:
-            i.msg = self.parse_name(i.msg)
             await self._comand_iterate(event, i)
-
-    def parse_name(self, arg):
-        if isinstance(arg, tuple):
-            l = []
-            for i in range(len(arg)):
-                l.append(arg[i].replace(self.bot_name, "gork"))
-            return tuple(l)
-        else:
-            return arg.replace(self.bot_name, "gork")
 
     @property
     def bot_name(self):
-        return "$210000(NAME_OF_BOT)"
+        return "gork"
         
     async def _comand_iterate(self, event: BotEvent, comand: ComandType):
         async def call(callee):
             if asyncio.iscoroutine(callee):
                 await callee
+
+        def is_comand(args):
+            return any([event.message.lower() == i for i in args])
+                
+        def is_tag_there(args):
+            return any([event.message.lower().startswith(i) for i in args])
+                
+        def is_reply_message_correct():
+            return len(event.reply_message) != 0 and event.reply_message[0] == -int(GROUP_ID)
+
+        def is_header_correct(head):
+            return is_reply_message_correct() and event.reply_message[1][:len(head)] == head
+
+        def is_arguments_correct(tags, count_args):
+            if count_args == 0: return True
+
+            msg = event.message.lower()
+            for i in tags:
+                f = msg.find(i)
+                if f == 0:
+                    msg = msg[len(i):]
+                    break
+                
+            msg = msg.split()
+            if len(msg) == count_args:
+                return True
+            return False
         
         match comand.comand_type:
             case ComandType.IS_COMAND:
-                if any([event.message.lower() == i for i in comand.msg]):
+                if is_comand(comand.args):
                     await call(comand.doer(event))
             case ComandType.IS_TAG:
-                if any([event.message.lower().startswith(i) for i in comand.msg]):
+                if is_tag_there(comand.args) and is_arguments_correct(comand.args, comand.msg):
                     await call(comand.doer(event))
             case ComandType.ON_REPLY:
                 if len(event.reply_message) != 0:
                     await call(comand.doer(event))
             case ComandType.ON_REPLY_TAG:
-                if len(event.reply_message) != 0 and any([event.message.lower().startswith(i) for i in comand.msg]):
+                if len(event.reply_message) != 0 and is_tag_there(comand.args):
                     await call(comand.doer(event))
             case ComandType.NEW_MESSAGE:
                 await call(comand.doer(event))
-            case ComandType.ON_REPLY_SELF:
-                if len(event.reply_message) == 0 or event.reply_message[0] != -int(GROUP_ID):
-                    return
-                if comand.msg == "" or event.reply_message[1][:len(comand.msg)] == comand.msg:
+            case ComandType.HEADER:
+                if is_header_correct(comand.msg):
+                    await call(comand.doer(event))
+            case ComandType.HEADER_TAG:
+                if is_header_correct(comand.msg) and is_tag_there(comand.args):
+                    await call(comand.doer(event))
+            case ComandType.HEADER_COMAND:
+                if is_header_correct(comand.msg) and is_comand(comand.args):
                     await call(comand.doer(event))
                     
     def listen(self):
@@ -135,6 +160,16 @@ class Bot:
     def get_event(self):
         for i in self._longpoll.listen():
             yield BotEvent(i)
+
+    def get_raw_conversation_member(self, vk_id, peer_id): # no err handling
+        if not isinstance(vk_id, int) or not isinstance(peer_id, int):
+            raise ValueError("Restricted type")
+
+        mbrs = self.get_raw_conversation_members(peer_id) 
+        l = [i for i in mbrs['items'] if vk_id == i["member_id"]]
+        misc =  self._session.method("users.get", {"user_ids": vk_id})
+        
+        return l[0] | misc[0]
             
     def get_raw_conversation_members(self, peer_id):
         if not isinstance(peer_id, int):
@@ -168,35 +203,58 @@ class Bot:
 
     def comand(self, *args):
         def decorator(func):
-            self._comands.append(Comand(comand_type=ComandType.IS_COMAND, msg=args, doer=func))
+            self._comands.append(Comand(comand_type=ComandType.IS_COMAND, msg="", args=args, doer=func))
             return func
         return decorator
 
-    def tag(self, *args):
+    def tag(self, *args, take_args=0):
         def decorator(func):
-            self._comands.append(Comand(comand_type=ComandType.IS_TAG, msg=args, doer=func))
+            self._comands.append(Comand(comand_type=ComandType.IS_TAG, msg=take_args, args=args, doer=func))
             return func
         return decorator
-
+    
     def new_message(self, func): # decorator
-        self._comands.append(Comand(comand_type=ComandType.NEW_MESSAGE, msg="", doer=func))
+        self._comands.append(Comand(comand_type=ComandType.NEW_MESSAGE, msg="", args=(), doer=func))
         return func
 
     def on_reply(self, func): # decorator
-        self._comands.append(Comand(comand_type=ComandType.ON_REPLY, msg="", doer=func))
+        self._comands.append(Comand(comand_type=ComandType.ON_REPLY, msg="", args=(), doer=func))
         return func
 
     def on_reply_tag(self, *args):
         def decorator(func):
-            self._comands.append(Comand(comand_type=ComandType.ON_REPLY_TAG, msg=args, doer=func))
+            self._comands.append(Comand(comand_type=ComandType.ON_REPLY_TAG, msg="", args=args, doer=func))
             return func
         return decorator
 
-    def on_reply_self(self, header: str = ""): # decorator
+    def header(self, head: str = ""): # decorator
+        if head == "":
+            raise ValueError("No header specified")
+        
         def decorator(func):
-            self._comands.append(Comand(comand_type=ComandType.ON_REPLY_SELF, msg=header, doer=func))
+            self._comands.append(Comand(comand_type=ComandType.HEADER, msg=head, args=(), doer=func))
             return func
         return decorator
+
+    def header_tag(self, head: str = "", *args): # decorator
+        if head == "":
+            raise ValueError("No header specified")
+        
+        def decorator(func):
+            self._comands.append(Comand(comand_type=ComandType.HEADER_TAG, msg=head, args=args, doer=func))
+            return func
+        return decorator
+
+    def header_comand(self, head: str = "", *args): # decorator
+        if head == "":
+            raise ValueError("No header specified")
+        
+        def decorator(func):
+            self._comands.append(Comand(comand_type=ComandType.HEADER_TAG, msg=head, args=args, doer=func))
+            return func
+        return decorator
+
+    
     
 class LongPoll(VkBotLongPoll):
     def listen(self):

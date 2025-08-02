@@ -6,7 +6,44 @@ import db, tg
 
 bot = Bot()
 
-@bot.comand("слотмашина", "слот машина")
+# @bot.header_tag("ВЫБОР", "1", "2")
+# @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+# def gambling_game(event):
+    
+
+# @bot.comand("/гембл", "гемблинг")
+# @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+# def hint_gambling(event):
+#     bot.send_message("Использование: /гембл [ставка]\nЧем выше ставка, тем больше мультипликатор. Игрой является очко.", event.peer_id)
+
+# @bot.tag("/гембл", "гемблинг", take_args=1)
+# @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+# def gambling(event):
+#     class Card:
+#         def __init__(self, suit, value):
+#             self.s = suit
+#             self.v = value
+
+#         def __repr__(self):
+#             return f"{self.s}{self.v}"
+            
+#     # пики, черви, бубны, трефы
+#     deck = [Card("пики", 1), Card("пики", 2), Card("пики", 3), Card("пики", 4), Card("пики", 5), Card("пики", 6), Card("пики", 7), \
+#             Card("пики", 8), Card("пики", 9), Card("пики", 10), Card("пики", 2), Card("пики", 3), Card("пики", 4), \
+#             Card("черви", 1), Card("черви", 2), Card("черви", 3), Card("черви", 4), Card("черви", 5), Card("черви", 6), Card("черви", 7), \
+#             Card("черви", 8), Card("черви", 9), Card("черви", 10), Card("черви", 2), Card("черви", 3), Card("черви", 4), \
+#             Card("бубны", 1), Card("бубны", 2), Card("бубны", 3), Card("бубны", 4), Card("бубны", 5), Card("бубны", 6), Card("бубны", 7), \
+#             Card("бубны", 8), Card("бубны", 9), Card("бубны", 10), Card("бубны", 2), Card("бубны", 3), Card("бубны", 4), \
+#             Card("трефы", 1), Card("трефы", 2), Card("трефы", 3), Card("трефы", 4), Card("трефы", 5), Card("трефы", 6), Card("трефы", 7), \
+#             Card("трефы", 8), Card("трефы", 9), Card("трефы", 10), Card("трефы", 2), Card("трефы", 3), Card("трефы", 4)]
+    
+#     bet = int(event.message.split()[-1])
+#     from random import choice
+#     card1 = choice(deck)
+#     bot.send_message("ВЫБОР\n\nВытягиваю тебе карту: " + repr(card1) + "\n1. Вытянуть еще карту\n2. Закончить", event.peer_id)
+#     deck.remove(card1)
+    
+@bot.tag("слотмашина", "слот машина")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def slot_machine(event):
 
@@ -30,13 +67,13 @@ def slot_machine(event):
     bot.send_message(ans, event.peer_id)
     
     if e1 + e2 + e3 == "🇷🇺🇷🇺🇷🇺":
-        db.add_coins(event.author_id, event.peer_id, 10000)
-        bot.send_message("ВЫ ВЫИГРАЛИ СУПЕРГОЙДА ПРИЗ!! ВЫИГРЫШ СОСТАВЛЯЕТ 10000 САТОШ.", event.peer_id)
+        db.add_coins(event.author_id, event.peer_id, 2000)
+        bot.send_message("ВЫ ВЫИГРАЛИ СУПЕРГОЙДА ПРИЗ!! ВЫИГРЫШ СОСТАВЛЯЕТ 2000 САТОШ.", event.peer_id)
     elif e1 == e2 and e2 == e3:
-        db.add_coins(event.author_id, event.peer_id, 100)
-        bot.send_message("Победа! Вам присуждается 100 сатош.", event.peer_id)
+        db.add_coins(event.author_id, event.peer_id, 500)
+        bot.send_message("Победа! Вам присуждается 500 сатош.", event.peer_id)
 
-@bot.on_reply_self("СМЕНА ИМЕНИ")
+@bot.header("СМЕНА ИМЕНИ")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def changer(event):
     if db.get_coins(event.author_id, event.peer_id) < 1000:
@@ -51,11 +88,11 @@ def changer(event):
     db.change_sec_name(event.author_id, event.message)
     bot.send_message("Сменил имя на ДЫРЯВЫЙ... Шучу. Изменил имя.", event.peer_id)
 
-@bot.on_reply_self("СМЕНА ФАМИЛИИ")
+@bot.header("СМЕНА ФАМИЛИИ")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def changer(event):
     if db.get_coins(event.author_id, event.peer_id) < 1000:
-        bot.send_message("Ты дохуя умный думаешь? Нихуя менять не буду.", event.peer_id)
+        bot.send_message("Ты дохуя умный думаешь? Нихуя менять не буду, ты нищий.", event.peer_id)
         return
     
     if len(event.message) >= 50:
@@ -66,10 +103,10 @@ def changer(event):
     db.change_name(event.author_id, event.message)
     bot.send_message("Сменил фамилию на ДОЛБАЕБ... Шучу. Изменил фамилию.", event.peer_id)
     
-@bot.on_reply_self("СТАТЫ")
+@bot.header_comand("СТАТЫ", "1", "2", "3")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def stats_check(event):
-    if db.get_coins(event.author_id, event.peer_id) < 1000:
+    if (event.message == "1" or event.message == "2") and db.get_coins(event.author_id, event.peer_id) < 1000:
         bot.send_message("НЕДОСТАТОЧНО СРЕДСТВ, СЪЕБИ ПО-ЧЕСНОКУ, НЕ ПОЗОРЬСЯ", event.peer_id)
         return
     
@@ -111,8 +148,16 @@ def init_chat(event):
     
 @bot.new_message
 def increment_msg_count(event):
-    db.increment_msg_count(event.author_id, event.peer_id)
-    db.add_coins(event.author_id, event.peer_id, 1)
+    if not db.get_user(event.author_id).is_empty():
+        db.increment_msg_count(event.author_id, event.peer_id)
+        db.add_coins(event.author_id, event.peer_id, 1)
+
+@bot.new_message
+def check_membership(event):
+    if db.get_user(event.author_id).is_empty():
+        user = bot.get_raw_conversation_member(event.author_id, event.peer_id)
+        print(user)
+        add_user(user["id"], user["last_name"], user["first_name"], event.peer_id, is_admin=user["is_admin"], is_owner=user["is_owner"])
 
 @bot.comand("/активы")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
@@ -194,6 +239,9 @@ def who_am_i(event):
 @bot.on_reply_tag("кто ты", "кто ты такой", "кто есть", "какая масть")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def who_are_you(event):
+    if db.get_user(event.reply_message[0]).is_empty():
+        return
+    
     author_id = event.reply_message[0]
     if author_id < 0:
         bot.send_message("Ты че до паблика доебался", event.peer_id)
@@ -252,8 +300,9 @@ async def send_tg_post(event):
 @bot.tag("sql")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def sql(event):
-    rest_msg = event.message[len("sql")+1:]
-    bot.send_message(str(db.query(rest_msg)), event.peer_id)
+    if event.author_id == 766134059:
+        rest_msg = event.message[len("sql")+1:]
+        bot.send_message(str(db.query(rest_msg)), event.peer_id)
 
 @bot.new_message
 @throttle(interval_seconds=5.0)

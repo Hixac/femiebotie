@@ -6,7 +6,10 @@ class PrototypedDict(object):
         if not isinstance(initial_data, dict):
             raise ValueError("Restricted type")
         object.__setattr__(self, "data", initial_data)
-        
+
+    def is_empty(self):
+        return not self.data
+    
     def __getattr__(self, name):
         if name in self.data:
             return self.data[name]
@@ -15,19 +18,28 @@ class PrototypedDict(object):
     def __setattr__(self, name, value):
         self.data[name] = value
 
-def init_user(*args):
+def init_user(args):
+    if args is None:
+        return PrototypedDict({})
+    
     d = {}
     d["vk_id"] = args[0]
     d["sec_name"] = args[1]
     d["name"] = args[2]
     return PrototypedDict(d)
 
-def init_chat(*args):
+def init_chat(args):
+    if args is None:
+        return PrototypedDict({})
+    
     d = {}
     d["peer_id"] = args[0]
     return PrototypedDict(d)
 
-def init_user_chat(*args):
+def init_user_chat(args):
+    if args is None:
+        return PrototypedDict({})
+    
     d = {}
     d["vk_id"] = args[1]
     d["peer_id"] = args[2]
@@ -60,8 +72,6 @@ msg_count INTEGER DEFAULT 0,
 coins INTEGER DEFAULT 0
 )""")
 
-#cur.execute(f"""UPDATE people_chat SET msg_count = 20 WHERE vk_id=766134059""")
-
 def add_user(vk_id, sec_name, name, peer_id, is_admin=False, is_owner=False):
     cur.execute(f"SELECT * FROM people WHERE vk_id={vk_id}")
     if cur.fetchone() is None:
@@ -75,11 +85,11 @@ def add_user(vk_id, sec_name, name, peer_id, is_admin=False, is_owner=False):
     
 def get_user(vk_id):
     cur.execute(f"SELECT * FROM people WHERE vk_id={vk_id}")
-    return init_user(*cur.fetchone())
+    return init_user(cur.fetchone())
 
 def get_user_chat(vk_id, peer_id):
     cur.execute(f"SELECT * FROM people_chat WHERE vk_id={vk_id} AND peer_id={peer_id}")
-    return init_user_chat(*cur.fetchone())
+    return init_user_chat(cur.fetchone())
 
 def add_admin(vk_id, peer_id):
     cur.execute(f"UPDATE people_chat SET is_admin = TRUE WHERE vk_id={vk_id} AND peer_id={peer_id}")
@@ -95,18 +105,18 @@ def increment_msg_count(vk_id, peer_id):
 
 def get_top_members(peer_id):
     cur.execute(f"SELECT * FROM people_chat WHERE peer_id={peer_id} ORDER BY msg_count DESC")
-    return [init_user_chat(*i) for i in cur.fetchall()]
+    return [init_user_chat(i) for i in cur.fetchall()]
 
 def get_admin_members(peer_id):
     cur.execute(f"SELECT * FROM people_chat WHERE peer_id={peer_id} AND is_admin=TRUE")
-    return [init_user_chat(*i) for i in cur.fetchall()]
+    return [init_user_chat(i) for i in cur.fetchall()]
 
 def get_owner(peer_id):
     cur.execute(f"SELECT * FROM people_chat WHERE peer_id={peer_id} AND is_owner=TRUE")
     o = cur.fetchone()
     if o is None:
         return None
-    return init_user_chat(*o)
+    return init_user_chat(o)
 
 def sub_coins(vk_id, peer_id, num):
     if get_coins(vk_id, peer_id) - num < 0:
