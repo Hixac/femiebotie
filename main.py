@@ -88,6 +88,7 @@ def gambling(event):
         kbd = Keyboard(inline=True)
         if len(opponent_cards) < 5:
             kbd.add_callback_button("Вытянуть карту", ButtonColor.PRIMARY, payload={"callback_type": CallbackType.GAMBLING_GAME_GRAB})
+            kbd.add_line()
         kbd.add_callback_button("Показать карты", ButtonColor.PRIMARY, payload={"callback_type": CallbackType.GAMBLING_GAME_SHOW})
         bot.edit_message(ans, event.callback_conv_msg_id, event.peer_id, keyboard=kbd.get_keyboard())
 
@@ -317,7 +318,9 @@ def who_am_i(event):
 
     kbd = Keyboard(inline=True)
     kbd.add_callback_button("Сменить имя", color=ButtonColor.PRIMARY, payload={"callback_type": CallbackType.MARKET, "chose": 1})
+    kbd.add_line()
     kbd.add_callback_button("Сменить фамилию", color=ButtonColor.PRIMARY, payload={"callback_type": CallbackType.MARKET, "chose": 2})
+    kbd.add_line()
     kbd.add_callback_button("Стать вип", color=ButtonColor.PRIMARY, payload={"callback_type": CallbackType.MARKET, "chose": 3})
     
     bot.send_message(ans, event.peer_id, keyboard=kbd.get_keyboard())
