@@ -67,7 +67,7 @@ def gambling(event):
         elif opponent_sum() > my_sum():
             ans += "\n\nГоспожа Удача улыбается тебе, жри свои ебаные сатошки."
             db.add_coins(playing_with, event.peer_id, bet)
-        elif opponent_sum() == my_sum():
+        elif opponent_sum() <= my_sum():
             ans += "\n\nСоси, лмао. Я победитель по жизни."
             db.sub_coins(playing_with, event.peer_id, bet)
         return ans
@@ -84,13 +84,6 @@ def gambling(event):
         if len(opponent_cards) > 1:
             ans = f"Твои карты {show_opponent_cards()}"
             ans += f"\nВ сумме будет {str(opponent_sum())}"
-        if len(opponent_cards) > 5:
-            ans += f"\nРаскрываемся.\nМои карты: {show_my_cards()}"
-            ans += f", что в сумме {str(my_sum())}."
-            ans += end_stage()
-                
-            bot.edit_message(ans, event.callback_conv_msg_id, event.peer_id)
-            return
 
         kbd = Keyboard(inline=True)
         if len(opponent_cards) < 5:
@@ -125,8 +118,6 @@ def gambling(event):
     kbd = Keyboard(inline=True)
     kbd.add_callback_button("Вытянуть карту", ButtonColor.PRIMARY, payload={"callback_type": CallbackType.GAMBLING_GAME_GRAB})
     bot.send_message(f"Игра в Очко с {user.name} {user.sec_name} началась.\n\nЯ вытянул первую карту.", event.peer_id, keyboard=kbd.get_keyboard())
-
-    my_cards.append(deck.pop())
 
 @bot.tag("слотмашина", "слот машина")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
@@ -243,7 +234,7 @@ def increment_msg_count(event):
 
 @bot.new_message
 def check_membership(event):
-    if db.get_user(event.author_id).is_empty():
+    if db.get_user_chat(event.author_id, event.peer_id).is_empty():
         user = bot.get_raw_conversation_member(event.author_id, event.peer_id)
         is_admin = user["is_admin"] if "is_admin" in user else False
         is_owner = user["is_admin"] if "is_admin" in user else False
