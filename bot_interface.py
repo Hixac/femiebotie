@@ -12,6 +12,11 @@ from collections.abc import Callable
 from types import CoroutineType
 from enum import Enum
 
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
+
+Keyboard = VkKeyboard
+ButtonColor = VkKeyboardColor
+
 class BotEvent:
     def __init__(self, event: VkBotMessageEvent):
         self.event = event
@@ -37,16 +42,38 @@ class BotEvent:
     @property
     def message(self) -> str:
         return self.event.message["text"] if not (self.event is None) else ""
+    
+    @property
+    def callback_payload(self) -> str | dict | list | None:
+        return self.event.object.payload
 
     @property
+    def callback_event_id(self) -> str:
+        return self.event.object.event_id
+
+    @property
+    def callback_conv_msg_id(self) -> int:
+        return self.event.object.conversation_message_id
+    
+    @property
     def author_id(self) -> str:
-        return self.event.message["from_id"]
+        if not (self.event.message is None):
+            return self.event.message["from_id"]
+        else:
+            return self.event.object.user_id
 
     @property
     def peer_id(self) -> int:
-        return self.event.message["peer_id"]
+        if not (self.event.message is None):
+            return self.event.message["peer_id"]
+        else:
+            return self.event.object.peer_id
 
-
+class CallbackType:
+    GAMBLING_GAME_GRAB = "GAMBLING_GAME_GRAB"
+    GAMBLING_GAME_SHOW = "GAMBLING_GAME_SHOW"
+    MARKET = "MARKET"
+    
 class ComandType(Enum):
     IS_TAG = 1
     IS_COMAND = 2
@@ -57,6 +84,8 @@ class ComandType(Enum):
     HEADER_TAG = 7
     HEADER_COMAND = 8
     IS_TAG_ARGUMENTED = 9
+    ANY_CALLBACK = 10
+    BY_CALLBACK_TYPE = 11
     
 @dataclass
 class Comand:
@@ -66,6 +95,10 @@ class Comand:
     args: tuple
 
 class Bot:
+    @property
+    def bot_name(self):
+        return "gork"
+
     def __init__(self):
         self._comands: List[Comand] = []
         
@@ -90,13 +123,30 @@ class Bot:
 
     async def _process_comands(self, event: BotEvent):
         for i in self._comands:
-            await self._comand_iterate(event, i)
+            if event.event_type == VkBotEventType.MESSAGE_NEW:
+                await self._comand_iterate(event, i)
+            elif event.event_type == VkBotEventType.MESSAGE_EVENT:
+                await self._callback_iterate(event, i)
 
-    @property
-    def bot_name(self):
-        return "gork"
-        
-    async def _comand_iterate(self, event: BotEvent, comand: ComandType):
+    async def _callback_iterate(self, event: BotEvent, comand: Comand):
+        async def call(callee):
+            if asyncio.iscoroutine(callee):
+                await callee
+
+        def is_callback_type_correct(callback_type):
+            payload = event.callback_payload
+            return not (payload is None) and "callback_type" in payload and payload["callback_type"] == callback_type
+
+        match comand.comand_type:
+            case ComandType.ANY_CALLBACK:
+                await call(comand.doer(event))
+            case ComandType.BY_CALLBACK_TYPE:
+                if is_callback_type_correct(comand.msg):
+                    await call(comand.doer(event))
+            case _:
+                return
+    
+    async def _comand_iterate(self, event: BotEvent, comand: Comand):
         async def call(callee):
             if asyncio.iscoroutine(callee):
                 await callee
@@ -182,23 +232,67 @@ class Bot:
         temp = upload.photo_messages(direc)[0]
         
         return "photo" + str(temp["owner_id"]) + "_" + str(temp["id"])
+
+    def preset_open_link(self, url):
+        if not isinstance(url, str):
+            return ValueError("Restricted type")
+        return {"type": "open_link", "link": url}
     
-    def send_message(self, msg, peer_id, photo_dir=""):
+    def preset_show_snackbar(self, text):
+        if not isinstance(text, str):
+            return ValueError("Restricted type")
+        return {"type": "show_snackbar", "text": text}
+
+    def edit_message(self, msg, conv_msg_id, peer_id, keyboard={}):
+        if not isinstance(msg, str) or not isinstance(peer_id, int):
+            raise ValueError("Restricted type")
+        if msg == "":
+            msg = "Пустое сообщение"
+
+        params = {
+            "peer_id": peer_id,
+            "conversation_message_id": conv_msg_id,
+            "message": msg
+        }
+
+        if keyboard:
+            params["keyboard"] = keyboard
+            
+        self._session.method("messages.edit", params)
+    
+    def send_event(self, event_id, user_id, peer_id, event_data):
+        import json
+        event_data = json.dumps(event_data)
+        
+        params = {
+            "event_id": event_id,
+            "user_id": user_id,
+            "peer_id": peer_id,
+            "event_data": event_data
+        }
+
+        self._session.method("messages.sendMessageEventAnswer", params)
+    
+    def send_message(self, msg, peer_id, photo_dir="", keyboard={}, reply_to=0):
         if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(photo_dir, str):
             raise ValueError("Restricted type")
         if msg == "":
             msg = "Пустое сообщение"
 
-        if photo_dir != "":
-            photo_dir = self.get_upload_photo(photo_dir)
-
         params = {
             "peer_id": peer_id,
             "random_id": 0,
-            "message": msg,
-            "attachment": photo_dir
+            "message": msg
         }
-                
+
+        if keyboard:
+            params["keyboard"] = keyboard
+        if photo_dir:
+            photo_dir = self.get_upload_photo(photo_dir)
+            params["attachment"] = photo_dir
+        if reply_to != 0:
+            params["reply_to"] = reply_to
+            
         self._session.method("messages.send", params)
 
     def comand(self, *args):
@@ -253,8 +347,19 @@ class Bot:
             self._comands.append(Comand(comand_type=ComandType.HEADER_TAG, msg=head, args=args, doer=func))
             return func
         return decorator
-
     
+    def any_callback(self, func): # decorator
+        self._comands.append(Comand(comand_type=ComandType.ANY_CALLBACK, msg="", args=(), doer=func))
+        return func
+
+    def by_callback_type(self, callback_type = 0):
+        if callback_type == 0:
+            raise ValueError("No type specified")
+        
+        def decorator(func):
+            self._comands.append(Comand(comand_type=ComandType.BY_CALLBACK_TYPE, msg=callback_type, args=(), doer=func))
+            return func
+        return decorator
     
 class LongPoll(VkBotLongPoll):
     def listen(self):

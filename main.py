@@ -1,4 +1,4 @@
-from bot_interface import Bot
+from bot_interface import Bot, Keyboard, ButtonColor, CallbackType
 from async_stuff import throttle
 import error_handle as eh
 import openrouter_api
@@ -6,43 +6,128 @@ import db, tg
 
 bot = Bot()
 
-# @bot.header_tag("ВЫБОР", "1", "2")
-# @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
-# def gambling_game(event):
-    
+@bot.comand("/гембл", "гемблинг")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def hint_gambling(event):
+    bot.send_message("Использование: /гембл [ставка]\nЧем выше ставка, тем больше мультипликатор. Игрой является очко.", event.peer_id)
 
-# @bot.comand("/гембл", "гемблинг")
-# @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
-# def hint_gambling(event):
-#     bot.send_message("Использование: /гембл [ставка]\nЧем выше ставка, тем больше мультипликатор. Игрой является очко.", event.peer_id)
+@bot.tag("/гембл", "гемблинг", take_args=1)
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def gambling(event):
+    class Card:
+        def __init__(self, suit, value, extra=""):
+            self.s = suit
+            self.v = value
+            self.extra = extra
 
-# @bot.tag("/гембл", "гемблинг", take_args=1)
-# @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
-# def gambling(event):
-#     class Card:
-#         def __init__(self, suit, value):
-#             self.s = suit
-#             self.v = value
-
-#         def __repr__(self):
-#             return f"{self.s}{self.v}"
+        def __str__(self):
+            if self.extra:
+                return f"{self.s}{self.extra}"
             
-#     # пики, черви, бубны, трефы
-#     deck = [Card("пики", 1), Card("пики", 2), Card("пики", 3), Card("пики", 4), Card("пики", 5), Card("пики", 6), Card("пики", 7), \
-#             Card("пики", 8), Card("пики", 9), Card("пики", 10), Card("пики", 2), Card("пики", 3), Card("пики", 4), \
-#             Card("черви", 1), Card("черви", 2), Card("черви", 3), Card("черви", 4), Card("черви", 5), Card("черви", 6), Card("черви", 7), \
-#             Card("черви", 8), Card("черви", 9), Card("черви", 10), Card("черви", 2), Card("черви", 3), Card("черви", 4), \
-#             Card("бубны", 1), Card("бубны", 2), Card("бубны", 3), Card("бубны", 4), Card("бубны", 5), Card("бубны", 6), Card("бубны", 7), \
-#             Card("бубны", 8), Card("бубны", 9), Card("бубны", 10), Card("бубны", 2), Card("бубны", 3), Card("бубны", 4), \
-#             Card("трефы", 1), Card("трефы", 2), Card("трефы", 3), Card("трефы", 4), Card("трефы", 5), Card("трефы", 6), Card("трефы", 7), \
-#             Card("трефы", 8), Card("трефы", 9), Card("трефы", 10), Card("трефы", 2), Card("трефы", 3), Card("трефы", 4)]
+            return f"{self.s}{self.v}"
+
+    my_cards = []
+    opponent_cards = []
     
-#     bet = int(event.message.split()[-1])
-#     from random import choice
-#     card1 = choice(deck)
-#     bot.send_message("ВЫБОР\n\nВытягиваю тебе карту: " + repr(card1) + "\n1. Вытянуть еще карту\n2. Закончить", event.peer_id)
-#     deck.remove(card1)
+    deck = [Card("♠️", 1, "туз"), Card("♠️", 2), Card("♠️", 3), Card("♠️", 4), Card("♠️", 5), Card("♠️", 6), Card("♠️", 7), \
+            Card("♠️", 8), Card("♠️", 9), Card("♠️", 10), Card("♠️", 2, "валет"), Card("♠️", 3, "дама"), Card("♠️", 4, "король"), \
+            Card("♥️", 1, "туз"), Card("♥️", 2), Card("♥️", 3), Card("♥️", 4), Card("♥️", 5), Card("♥️", 6), Card("♥️", 7), \
+            Card("♥️", 8), Card("♥️", 9), Card("♥️", 10), Card("♥️", 2, "валет"), Card("♥️", 3, "дама"), Card("♥️", 4, "король"), \
+            Card("♦️", 1, "туз"), Card("♦️", 2), Card("♦️", 3), Card("♦️", 4), Card("♦️", 5), Card("♦️", 6), Card("♦️", 7), \
+            Card("♦️", 8), Card("♦️", 9), Card("♦️", 10), Card("♦️", 2, "валет"), Card("♦️", 3, "дама"), Card("♦️", 4, "король"), \
+            Card("♣️", 1, "туз"), Card("♣️", 2), Card("♣️", 3), Card("♣️", 4), Card("♣️", 5), Card("♣️", 6), Card("♣️", 7), \
+            Card("♣️", 8), Card("♣️", 9), Card("♣️", 10), Card("♣️", 2, "валет"), Card("♣️", 3, "дама"), Card("♣️", 4, "король")]
+    from random import shuffle
+    shuffle(deck)
+
+    def show_my_cards():
+        return ' '.join([str(i) for i in my_cards[:min(len(my_cards), 5)]])
+
+    def show_opponent_cards():
+        return ' '.join([str(i) for i in opponent_cards[:min(len(opponent_cards), 5)]])
+
+    def my_sum():
+        return sum(i.v for i in my_cards[:min(len(my_cards), 5)])
+
+    def opponent_sum():
+        return sum(i.v for i in opponent_cards[:min(len(opponent_cards), 5)])
+
+    def end_stage():
+        nonlocal bet, playing_with
+        ans = ""
+        if opponent_sum() > 21:
+            ans += "\n\nТы проиграл, вся ставка моя."
+            db.sub_coins(playing_with, event.peer_id, bet)
+        elif opponent_sum() <= 21 and my_sum() == 21:
+            ans += "\n\nПолная неудача, вся ставка моя."
+            db.sub_coins(playing_with, event.peer_id, bet)
+        elif opponent_sum() <= 21 and my_sum() > 21:
+            ans += "\n\nТы победил, признаю, держи мои бабки."
+            db.add_coins(playing_with, event.peer_id, bet)
+        elif opponent_sum() > my_sum():
+            ans += "\n\nГоспожа Удача улыбается тебе, жри свои ебаные сатошки."
+            db.add_coins(playing_with, event.peer_id, bet)
+        elif opponent_sum() == my_sum():
+            ans += "\n\nСоси, лмао. Я победитель по жизни."
+            db.sub_coins(playing_with, event.peer_id, bet)
+        return ans
+            
+    @bot.by_callback_type(CallbackType.GAMBLING_GAME_GRAB)
+    @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+    def grab(event):
+        nonlocal playing_with, bet
+        if event.author_id != playing_with:
+            return
+        opponent_cards.append(deck.pop())
+        my_cards.append(deck.pop())
+        ans = f"Твоя карта {str(opponent_cards[-1])}"
+        if len(opponent_cards) > 1:
+            ans = f"Твои карты {show_opponent_cards()}"
+            ans += f"\nВ сумме будет {str(opponent_sum())}"
+        if len(opponent_cards) > 5:
+            ans += f"\nРаскрываемся.\nМои карты: {show_my_cards()}"
+            ans += f", что в сумме {str(my_sum())}."
+            ans += end_stage()
+                
+            bot.edit_message(ans, event.callback_conv_msg_id, event.peer_id)
+            return
+
+        kbd = Keyboard(inline=True)
+        if len(opponent_cards) < 5:
+            kbd.add_callback_button("Вытянуть карту", ButtonColor.PRIMARY, payload={"callback_type": CallbackType.GAMBLING_GAME_GRAB})
+        kbd.add_callback_button("Показать карты", ButtonColor.PRIMARY, payload={"callback_type": CallbackType.GAMBLING_GAME_SHOW})
+        bot.edit_message(ans, event.callback_conv_msg_id, event.peer_id, keyboard=kbd.get_keyboard())
+
+    @bot.by_callback_type(CallbackType.GAMBLING_GAME_SHOW)
+    @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+    def show(event):
+        nonlocal playing_with, bet
+        if event.author_id != playing_with:
+            return
+        ans = f"Твои карты {show_opponent_cards()}"
+        ans += f"\nВ сумме будет {str(opponent_sum())}"
+        ans += f"\nРаскрываемся. Мои карты: {show_my_cards()}"
+        ans += f", что в сумме {str(my_sum())}."
+        ans += end_stage()
+                
+        bot.edit_message(ans, event.callback_conv_msg_id, event.peer_id)
+        return
     
+    bet = event.message.split()[-1]
+    if not bet.isnumeric() or int(bet) > db.get_coins(event.author_id, event.peer_id):
+        bot.send_message("Ставку нужно писать в числах, в пределах твоих сатош.", event.peer_id)
+        return
+
+    bet = int(bet)
+    playing_with = event.author_id
+    user = db.get_user(playing_with)
+    
+    kbd = Keyboard(inline=True)
+    kbd.add_callback_button("Вытянуть карту", ButtonColor.PRIMARY, payload={"callback_type": CallbackType.GAMBLING_GAME_GRAB})
+    bot.send_message(f"Игра в Очко с {user.name} {user.sec_name} началась.\n\nЯ вытянул первую карту.", event.peer_id, keyboard=kbd.get_keyboard())
+
+    my_cards.append(deck.pop())
+
 @bot.tag("слотмашина", "слот машина")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def slot_machine(event):
@@ -63,7 +148,7 @@ def slot_machine(event):
     ans = f"""+-----+-----+-----+
 | {e1} | {e2} | {e3} |
 +-----+-----+-----+"""
-    
+
     bot.send_message(ans, event.peer_id)
     
     if e1 + e2 + e3 == "🇷🇺🇷🇺🇷🇺":
@@ -76,8 +161,9 @@ def slot_machine(event):
 @bot.header("СМЕНА ИМЕНИ")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def changer(event):
-    if db.get_coins(event.author_id, event.peer_id) < 1000:
-        bot.send_message("Ты дохуя умный думаешь? Нихуя менять не буду.", event.peer_id)
+    coins = db.get_coins(event.author_id, event.peer_id)
+    if coins < 1000:
+        bot.send_message(f"Съеби, ебана. (У вас {coins} сатоши)", event.peer_id)
         return
     
     if len(event.message) >= 50:
@@ -91,8 +177,9 @@ def changer(event):
 @bot.header("СМЕНА ФАМИЛИИ")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def changer(event):
-    if db.get_coins(event.author_id, event.peer_id) < 1000:
-        bot.send_message("Ты дохуя умный думаешь? Нихуя менять не буду, ты нищий.", event.peer_id)
+    coins = db.get_coins(event.author_id, event.peer_id)
+    if coins < 1000:
+        bot.send_message(f"Не машни передо мной без бабла. (У вас {coins} сатоши)", event.peer_id)
         return
     
     if len(event.message) >= 50:
@@ -103,19 +190,21 @@ def changer(event):
     db.change_name(event.author_id, event.message)
     bot.send_message("Сменил фамилию на ДОЛБАЕБ... Шучу. Изменил фамилию.", event.peer_id)
     
-@bot.header_comand("СТАТЫ", "1", "2", "3")
+@bot.by_callback_type(CallbackType.MARKET)
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def stats_check(event):
-    if (event.message == "1" or event.message == "2") and db.get_coins(event.author_id, event.peer_id) < 1000:
-        bot.send_message("НЕДОСТАТОЧНО СРЕДСТВ, СЪЕБИ ПО-ЧЕСНОКУ, НЕ ПОЗОРЬСЯ", event.peer_id)
+    chose = event.callback_payload["chose"]
+
+    if db.get_coins(event.author_id, event.peer_id) < 1000:
+        bot.edit_message("Нищее ты хуйло, отъебись от меня.", event.callback_conv_msg_id, event.peer_id)
         return
     
-    if event.message == "1":
-        bot.send_message("СМЕНА ИМЕНИ\nКакое имя хочешь? Ответь мне, чтобы изменить.", event.peer_id)
-    elif event.message == "2":
-        bot.send_message("СМЕНА ФАМИЛИИ\nКакую фамилию хочешь? Ответь мне, чтобы изменить.", event.peer_id)
-    elif event.message == "3":
-        bot.send_message("У БОМЖА НЕДОСТАТОЧНО СРЕДСТВ", event.peer_id)
+    if chose == 1:
+        bot.edit_message("СМЕНА ИМЕНИ\nКакое имя хочешь? Ответь мне, чтобы изменить.", event.callback_conv_msg_id, event.peer_id)
+    elif chose == 2:
+        bot.edit_message("СМЕНА ФАМИЛИИ\nКакую фамилию хочешь? Ответь мне, чтобы изменить.", event.callback_conv_msg_id, event.peer_id)
+    elif chose == 3:
+        bot.edit_message("У БОМЖА НЕДОСТАТОЧНО СРЕДСТВ", event.callback_conv_msg_id, event.peer_id)
 
 @bot.on_reply_tag("шлепнуть", "шлёпнуть", "дать по жопе")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
@@ -156,8 +245,9 @@ def increment_msg_count(event):
 def check_membership(event):
     if db.get_user(event.author_id).is_empty():
         user = bot.get_raw_conversation_member(event.author_id, event.peer_id)
-        print(user)
-        add_user(user["id"], user["last_name"], user["first_name"], event.peer_id, is_admin=user["is_admin"], is_owner=user["is_owner"])
+        is_admin = user["is_admin"] if "is_admin" in user else False
+        is_owner = user["is_admin"] if "is_admin" in user else False
+        db.add_user(user["id"], user["last_name"], user["first_name"], event.peer_id, is_admin=is_admin, is_owner=is_owner)
 
 @bot.comand("/активы")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
@@ -230,11 +320,16 @@ def who_am_i(event):
         ans += "\nЯвляется админчиком!!!🤩"
     else: ans += "\nНе является админом...😰"
     ans += "\nИмеет " + str(db.get_coins(event.author_id, event.peer_id)) + " сатоши"
-    ans += "\n\n1. Сменить имя. Цена 1000 сатоши"
-    ans += "\n2. Сменить фамилию. Цена 1000 сатоши"
-    ans += "\n3. СТАТЬ ВИП. ЦЕНА 100000 САТОШИ"
+    ans += "\n\nСменить имя. Цена 1000 сатоши"
+    ans += "\nСменить фамилию. Цена 1000 сатоши"
+    ans += "\nСТАТЬ ВИП. ЦЕНА 100000 САТОШИ"
+
+    kbd = Keyboard(inline=True)
+    kbd.add_callback_button("Сменить имя", color=ButtonColor.PRIMARY, payload={"callback_type": CallbackType.MARKET, "chose": 1})
+    kbd.add_callback_button("Сменить фамилию", color=ButtonColor.PRIMARY, payload={"callback_type": CallbackType.MARKET, "chose": 2})
+    kbd.add_callback_button("Стать вип", color=ButtonColor.PRIMARY, payload={"callback_type": CallbackType.MARKET, "chose": 3})
     
-    bot.send_message(ans, event.peer_id)
+    bot.send_message(ans, event.peer_id, keyboard=kbd.get_keyboard())
 
 @bot.on_reply_tag("кто ты", "кто ты такой", "кто есть", "какая масть")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
