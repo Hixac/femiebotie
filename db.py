@@ -1,44 +1,35 @@
 import sqlite3
 from collections import UserDict
 
-class PrototypedDict(object):
-    def __init__(self, initial_data={}):
-        if not isinstance(initial_data, dict):
-            raise ValueError("Restricted type")
-        object.__setattr__(self, "data", initial_data)
-
+class DotDict(dict):
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+    
     def is_empty(self):
-        return not self.data
-    
-    def __getattr__(self, name):
-        if name in self.data:
-            return self.data[name]
-        return None
-    
-    def __setattr__(self, name, value):
-        self.data[name] = value
+        return not self
 
 def init_user(args):
     if args is None:
-        return PrototypedDict({})
+        return DotDict({})
     
     d = {}
     d["vk_id"] = args[0]
     d["sec_name"] = args[1]
     d["name"] = args[2]
-    return PrototypedDict(d)
+    return DotDict(d)
 
 def init_chat(args):
     if args is None:
-        return PrototypedDict({})
+        return DotDict({})
     
     d = {}
     d["peer_id"] = args[0]
-    return PrototypedDict(d)
+    return DotDict(d)
 
 def init_user_chat(args):
     if args is None:
-        return PrototypedDict({})
+        return DotDict({})
     
     d = {}
     d["vk_id"] = args[1]
@@ -48,7 +39,7 @@ def init_user_chat(args):
     d["msg_count"] = args[5]
     d["coins"] = args[6]
     
-    return PrototypedDict(d)
+    return DotDict(d)
 
 conn = sqlite3.connect("chat.db")
 cur = conn.cursor()

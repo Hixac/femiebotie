@@ -18,7 +18,7 @@ class OpenrouterAPI:
             'Content-Type': 'application/json'
         }
         payload = {
-            'model': 'qwen/qwen3-235b-a22b:free',
+            'model': "deepseek/deepseek-chat-v3-0324:free",
             'messages': [
                 {'role': 'user', 'content': prompt}
             ],
@@ -41,7 +41,7 @@ class OpenrouterAPI:
             'Content-Type': 'application/json'
         }
         payload = {
-            'model': "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+            'model': "deepseek/deepseek-chat-v3-0324:free",
             'messages': [
                 {'role': 'user', 'content': prompt}
             ],

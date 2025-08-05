@@ -10,8 +10,6 @@ async def _call(callee):
         await callee
         
 def handle_exception(default_response=empty, conn_error=empty):
-    
-    
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):

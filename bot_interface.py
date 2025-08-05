@@ -3,6 +3,7 @@ import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotMessageEvent, VkBotEventType
 from config import GROUP_TOKEN, GROUP_ID
 
+import json
 import asyncio
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +14,7 @@ from types import CoroutineType
 from enum import Enum
 
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
+from parse_vk_markup import Parser
 
 Keyboard = VkKeyboard
 ButtonColor = VkKeyboardColor
@@ -261,7 +263,6 @@ class Bot:
         self._session.method("messages.edit", params)
     
     def send_event(self, event_id, user_id, peer_id, event_data):
-        import json
         event_data = json.dumps(event_data)
         
         params = {
@@ -279,10 +280,22 @@ class Bot:
         if msg == "":
             msg = "Пустое сообщение"
 
+        if len(msg) > 4096:
+            from math import floor
+            for i in range(floor(len(msg) / 4096)):
+                self.send_message(msg[i * 4096:min((i + 1) * 4096, len(msg))], peer_id, photo_dir, keyboard, reply_to)
+            return
+            
+            
+        parser = Parser(msg)
+        format_data = parser.parse()
+        msg = parser.formatted_text
+
+        
         params = {
             "peer_id": peer_id,
             "random_id": 0,
-            "message": msg
+            "message": msg,
         }
 
         if keyboard:
@@ -292,6 +305,8 @@ class Bot:
             params["attachment"] = photo_dir
         if reply_to != 0:
             params["reply_to"] = reply_to
+        if format_data is not None:
+            params["format_data"] = format_data
             
         self._session.method("messages.send", params)
 

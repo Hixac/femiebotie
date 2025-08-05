@@ -6,12 +6,19 @@ import db, tg
 
 bot = Bot()
 
+@bot.tag("/do")
+@eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
+def action(event):
+    user = db.get_user(event.author_id)
+    ans = event.message[len('/do') + 1:]
+    bot.send_message(f"{user.name} {user.sec_name} {ans}", event.peer_id)
+
 @bot.comand("/гембл", "гемблинг")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def hint_gambling(event):
     bot.send_message("Использование: /гембл [ставка]\nЧем выше ставка, тем больше мультипликатор. Игрой является очко.", event.peer_id)
 
-@bot.tag("/гембл", "гемблинг", take_args=1)
+@bot.tag("/гембл", "гемблинг", take_args=1) # TODO: fix the issues with buttons
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def gambling(event):
     class Card:
@@ -120,7 +127,7 @@ def gambling(event):
     kbd.add_callback_button("Вытянуть карту", ButtonColor.PRIMARY, payload={"callback_type": CallbackType.GAMBLING_GAME_GRAB})
     bot.send_message(f"Игра в Очко с {user.name} {user.sec_name} началась.\n\nЯ вытянул первую карту.", event.peer_id, keyboard=kbd.get_keyboard())
 
-@bot.tag("слотмашина", "слот машина")
+@bot.tag("слотмашина", "слот машина") # TODO: add button
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)
 def slot_machine(event):
 
@@ -214,10 +221,13 @@ def take_it(event):
     
     bot.send_message(choice(answers), event.peer_id)
 
-@bot.tag(bot.bot_name, "горк", "ГОРК")
+@bot.tag(bot.bot_name, "горк", "ГОРК", "Горк")
 async def gork(event):
     rest_msg = "".join(event.message.split()[1:])
     content = await openrouter_api.api.async_query(rest_msg)
+    think = content.rfind("</think>")
+    if think != -1:
+       content = content[think + len("</think>"):]        
     bot.send_message(content, event.peer_id)
     await openrouter_api.cleanup()
 
