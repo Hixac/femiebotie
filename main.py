@@ -455,7 +455,7 @@ async def process_yt(event):
         title = get_title("https://www.youtube.com/watch?v=" + vid)
         filename = download_image("https://img.youtube.com/vi/" + vid + "/hqdefault.jpg", vid)
 
-        bot.send_message(title, event.peer_id, photo_dir=filename)
+        bot.send_message(title, event.peer_id, media_dir=[filename])
 
     
 if __name__ == "__main__":
