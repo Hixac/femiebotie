@@ -25,7 +25,7 @@ class BotEvent:
 
     @property
     def conversation_message_id(self):
-        return self.event.message['id']
+        return self.event.message['conversation_message_id']
     
     @property
     def raw(self):
@@ -235,11 +235,15 @@ class Bot:
     #
     #     return "video" + str(temp["owner_id"]) + "_" + str(temp["id"])
     
-    def get_upload_photo(self, direc: str) -> dict:
+    def get_upload_photo(self, direc: str, peer_id: int) -> dict:
         upload = vk_api.VkUpload(self._session)
-        temp = upload.photo_messages(direc)[0]
-        
-        return "photo" + str(temp["owner_id"]) + "_" + str(temp["id"])
+        temp = upload.photo_messages(direc, peer_id=peer_id)
+
+        ret = []
+        for photo in temp:
+            ret.append("photo" + str(photo["owner_id"]) + "_" + str(photo["id"]))
+
+        return ret
 
     def preset_open_link(self, url):
         if not isinstance(url, str):
@@ -280,8 +284,8 @@ class Bot:
 
         self._session.method("messages.sendMessageEventAnswer", params)
     
-    def send_message(self, msg, peer_id, media_dir="", keyboard={}, reply_to=0):
-        if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(media_dir, str):
+    def send_message(self, msg, peer_id, media_dir: list | str = "", keyboard={}, reply_to=0):
+        if not isinstance(msg, str) or not isinstance(peer_id, int):
             raise ValueError("Restricted type")
         if msg == "":
             msg = "Пустое сообщение"
@@ -311,13 +315,13 @@ class Bot:
             if "mp4" in media_dir:
                 print("Method is unavailable with group auth.")
             else:
-                media_dir = self.get_upload_photo(media_dir)
-                params["attachment"] = media_dir
+                media = self.get_upload_photo(media_dir, peer_id)
+                params["attachment"] = media
         if reply_to != 0:
             params["reply_to"] = reply_to
         if format_data is not None:
             params["format_data"] = format_data
-            
+
         self._session.method("messages.send", params)
 
     def comand(self, *args):
