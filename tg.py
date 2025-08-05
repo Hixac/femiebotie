@@ -36,14 +36,14 @@ async def get_post(chat, index=0, is_rand=False):
     
     media = []
     if message.media is not None and message.photo:
-        #if message.grouped_id is not None:
-        #    search_ids = [i for i in range(message.id - 10, message.id + 10 + 1)]
-        #    posts = await client.get_messages(chat, ids=search_ids)
-        #    media = []
-        #    for post in posts:
-        #        if post is not None and post.grouped_id == message.grouped_id and post.photo is not None:
-        #            media.append(await post.download_media())
-        #else:
-        media.append(await client.download_media(message.media))
+        if message.grouped_id is not None:
+            search_ids = [i for i in range(message.id - 10, message.id + 10 + 1)]
+            posts = await client.get_messages(chat, ids=search_ids)
+            media = []
+            for post in posts:
+                if post is not None and post.grouped_id == message.grouped_id and post.photo is not None:
+                    media.append(await post.download_media())
+        else:
+            media.append(await client.download_media(message.media))
 
     return (message.text, media)

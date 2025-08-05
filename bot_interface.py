@@ -316,7 +316,7 @@ class Bot:
                 print("Method is unavailable with group auth.")
             else:
                 media = self.get_upload_photo(media_dir, peer_id)
-                params["attachment"] = media
+                params["attachment"] = ",".join(media)
         if reply_to != 0:
             params["reply_to"] = reply_to
         if format_data is not None:
