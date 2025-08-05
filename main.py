@@ -394,7 +394,7 @@ async def send_tg_post(event):
     elif tag == "поздняков":
         post = await tg.get_post(tg.convert_id(1732054517), index, is_rand)
     
-    bot.send_message(post, event.peer_id)
+    bot.send_message(post[0], event.peer_id, media_dir=post[1])
 
 @bot.tag("sql")
 @eh.handle_exception(default_response=eh.automatic_response, conn_error=eh.connection_response)

@@ -229,6 +229,12 @@ class Bot:
         
         return self._session.method("messages.getConversationMembers", {"peer_id": peer_id})
 
+    # def get_upload_video(self, direc: str) -> dict:
+    #     upload = vk_api.VkUpload(self._session)
+    #     temp = upload.video(direc)[0]
+    #
+    #     return "video" + str(temp["owner_id"]) + "_" + str(temp["id"])
+    
     def get_upload_photo(self, direc: str) -> dict:
         upload = vk_api.VkUpload(self._session)
         temp = upload.photo_messages(direc)[0]
@@ -274,19 +280,20 @@ class Bot:
 
         self._session.method("messages.sendMessageEventAnswer", params)
     
-    def send_message(self, msg, peer_id, photo_dir="", keyboard={}, reply_to=0):
-        if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(photo_dir, str):
+    def send_message(self, msg, peer_id, media_dir="", keyboard={}, reply_to=0):
+        if not isinstance(msg, str) or not isinstance(peer_id, int) or not isinstance(media_dir, str):
             raise ValueError("Restricted type")
         if msg == "":
             msg = "Пустое сообщение"
 
+
         if len(msg) > 4096:
             from math import floor
             for i in range(floor(len(msg) / 4096)):
-                self.send_message(msg[i * 4096:min((i + 1) * 4096, len(msg))], peer_id, photo_dir, keyboard, reply_to)
+                self.send_message(msg[i * 4096:min((i + 1) * 4096, len(msg))], peer_id, media_dir, keyboard, reply_to)
             return
             
-            
+
         parser = Parser(msg)
         format_data = parser.parse()
         msg = parser.formatted_text
@@ -300,9 +307,12 @@ class Bot:
 
         if keyboard:
             params["keyboard"] = keyboard
-        if photo_dir:
-            photo_dir = self.get_upload_photo(photo_dir)
-            params["attachment"] = photo_dir
+        if media_dir:
+            if "mp4" in media_dir:
+                print("Method is unavailable with group auth.")
+            else:
+                media_dir = self.get_upload_photo(media_dir)
+                params["attachment"] = media_dir
         if reply_to != 0:
             params["reply_to"] = reply_to
         if format_data is not None:

@@ -9,7 +9,6 @@ convert_id = PeerChannel
 _tg_client = None
 
 async def get_tg_client():
-    """Асинхронный клиент Telegram с ленивой инициализацией"""
     global _tg_client
     if _tg_client is None:
         _tg_client = TelegramClient('rofls', TG_API_ID, TG_API_HASH)
@@ -17,7 +16,6 @@ async def get_tg_client():
     return _tg_client
 
 async def get_post(name, index=0, is_rand=False):
-    """Асинхронное получение поста из Telegram канала"""
     if not isinstance(is_rand, bool):
         raise ValueError("is_rand must be boolean")
     if not isinstance(index, int):
@@ -26,16 +24,17 @@ async def get_post(name, index=0, is_rand=False):
     client = await get_tg_client()
     channel = await client.get_entity(name)
     
-    if is_rand:
-        messages = []
-        async for msg in client.iter_messages(channel, limit=100):
-            if msg.text:
-                messages.append(msg.text)
-        return random.choice(messages) if messages else "Не найдено сообщений"
-    
     messages = []
-    async for msg in client.iter_messages(channel, limit=index+1):
+    async for msg in client.iter_messages(channel, limit=(index+1 if not is_rand else 100)):
         if msg.text:
-            messages.append(msg.text)
+            messages.append(msg)
 
-    return messages[-1] if messages else "Не найдено сообщений"
+    message = messages[-1]
+    if is_rand:
+        message = random.choice(messages)
+
+    media = ""
+    if message.media is not None and message.photo:
+        media = await client.download_media(message.media)
+
+    return (message.text, media)
